@@ -8,6 +8,8 @@
   vars:
     default_script_path: "/home/pi/check_status.sh"
     script_timeout: 3600  # max runtime in seconds
+    become: "{{ become | default(no) }}"
+    become_flags: "{{ become_flags }}"
 
   tasks:
     - name: Set script path (use extra-var if provided, otherwise default)

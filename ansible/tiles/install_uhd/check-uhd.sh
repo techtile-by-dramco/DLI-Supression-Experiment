@@ -65,17 +65,19 @@ ROOT_BASHRC="/root/.bashrc"
 PI_BASHRC="/home/pi/.bashrc"
 
 # Lines to ensure exist, using the variable
+HEADER="#Export environment variables needed by UHD"
 LINE1="export UHD_IMAGES_DIR=\"$images_dir\""
 LINE2='export PYTHONPATH="/usr/local/lib/python3.11/site-packages:$PYTHONPATH"'
 
 # Function: append line if no line starts with the same variable
 append_if_missing_prefix() {
-    local bashrc="$1"      # first argument = bashrc file
-    local line="$2"        # second argument = line to append
+    local file="$1"         # first argument = file name
+    local line="$2"         # second argument = line to append
+    local before="$3"
     local var_name=$(echo "$line" | cut -d '=' -f 1)
 
     if ! grep -q "^$var_name" "$bashrc"; then
-        echo "$line" >> "$bashrc"
+        echo "$before$line" >> "$bashrc"
         echo "Added line to $bashrc: $line"
     else
         echo "Variable '$var_name' already defined in $bashrc"
@@ -83,9 +85,12 @@ append_if_missing_prefix() {
 }
 
 # Check each line
-append_if_missing_prefix "$ROOT_BASHRC" "$LINE1"
-append_if_missing_prefix "$PI_BASHRC" "$LINE1"
-#append_if_missing_prefix "$LINE2"
+#append_if_missing_prefix "$ROOT_BASHRC" "$HEADER" "\n\n"
+append_if_missing_prefix "$PI_BASHRC" "$HEADER" "\n\n"
+#append_if_missing_prefix "$ROOT_BASHRC" "$LINE1" ""
+append_if_missing_prefix "$PI_BASHRC" "$LINE1" ""
+#append_if_missing_prefix "$ROOT_BASHRC" "$LINE2" ""
+#append_if_missing_prefix "$PI_BASHRC" "$LINE2" ""
 
 python3 - <<'EOF'
 import os, sys
@@ -95,18 +100,8 @@ try:
     usrp = uhd.usrp.MultiUSRP()
     print("✅ MultiUSRP() created successfully!")
 except Exception as e:
-    print("❌ First attempt failed:", e)
-    print("🔁 Retrying with custom PYTHONPATH...")
-    os.environ["PYTHONPATH"] = "/usr/local/lib/python3.11/site-packages:" + os.environ.get("PYTHONPATH", "")
-    try:
-        import importlib; importlib.invalidate_caches()
-        import uhd
-        print("✅ UHD module reloaded from:", uhd.__file__)
-        usrp = uhd.usrp.MultiUSRP()
-        print("✅ MultiUSRP() created successfully after setting PYTHONPATH!")
-    except Exception as e2:
-        print("❌ Still failed:", e2)
-        sys.exit(1)
+    print("❌ Failed:", e)
+    sys.exit(1)
 EOF
 
 echo "Done checking .bashrc."
