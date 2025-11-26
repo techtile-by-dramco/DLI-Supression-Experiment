@@ -60,5 +60,31 @@ EOF
     echo "Done. Please unplug and replug your USRP device."
 fi
 
-echo "OK"
+# Add the necessary lines to .bashrc
+# Lines to ensure exist, using the variable
+LINE1="export UHD_IMAGES_DIR=\"$images_dir\""
+LINE2='export PYTHONPATH="/usr/local/lib/python3.11/site-packages:$PYTHONPATH"'
+
+# Function: append line if no line starts with the same variable
+append_if_missing_prefix() {
+    local line="$1"
+    local var_name=$(echo "$line" | cut -d '=' -f 1)
+    
+    if ! grep -q "^$var_name" "$BASHRC"; then
+        echo "$line" >> "$BASHRC"
+        echo "Added line to $BASHRC: $line"
+    else
+        echo "Variable '$var_name' already defined in $BASHRC"
+    fi
+}
+
+# Check each line
+append_if_missing_prefix "$LINE1"
+append_if_missing_prefix "$LINE2"
+
+echo "Done checking .bashrc."
+
+
+
+echo "OK"   # output "OK" is captured by ansible
 exit 0
