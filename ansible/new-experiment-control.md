@@ -12,7 +12,7 @@ General usage example:
 
 Run ```check-uhd.sh``` on tile A05:
 ```bash
-ansible-playbook -i ansible/inventory/hosts.yaml ansible/general/run-script.yaml --extra-vars="script_path=/home/pi/geometry-based-wireless-power-transfer/ansible/tiles/install_uhd/check-uhd.sh sudo=yes sudo_flags=-E" --limit A05
+ansible-playbook -i ansible/inventory/hosts.yaml ansible/server/run-script.yaml --extra-vars="script_path=/home/pi/geometry-based-wireless-power-transfer/ansible/tiles/check-uhd.sh sudo=yes sudo_flags=-E" --limit A05
 ```
 
 A typical experiment can be divided into 3 phases:
