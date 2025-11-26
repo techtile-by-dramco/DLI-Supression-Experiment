@@ -1,9 +1,9 @@
 # A "new" experiment control system
 In the new system, ansible is used to manage the fleet of raspberry pi's that are part of the experiment setup.
 
-* **server** contains all ansible playbooks that can be run from your central management machine
-* **inventory** contains the ansible hosts inventory (and groups)
-* **tiles** contains scripts that are executed on the ansible hosts (i.e. the raspberry pi's) by means of the ansible playbook ```run-script.yaml```.
+* **ansible/server** contains all ansible playbooks that can be run from your central management machine
+* **ansible/inventory** contains the ansible hosts inventory (and groups)
+* **ansible/tiles** contains scripts that are executed on the ansible hosts (i.e. the raspberry pi's) by means of the ansible playbook ```run-script.yaml```.
 
 General usage example:
 ```bash
@@ -27,4 +27,26 @@ A typical experiment can be divided into 3 phases:
 
 3. Clean-up the pi (optional but highly encouraged): 'clean-home.yaml'
 
-TODO: Detailed description
+## Update
+Though ansible playbooks can be ran from commandline (ideal for testing), the **server** folder contains python scripts to automate some tasks.
+
+First, activate (or create and activate) the python venv on the server:
+```bash
+cd <project-or-repo-dir>
+source server/setup-server.sh
+```
+
+Then, run your experiment. For now, there's only a setup script:
+```bash
+python server/setup-clients.py
+```
+Keep in mind that this currently only pulls the experiment repo and checks if UHD is operational. If you want to apt update/upgrade and install extra packages on the host, you can use the ```update-upgrade.yaml``` and ```install-packages.yaml``` playbooks.
+
+Finally (really a the end when you have all your data someplace safe):
+```bash
+python server/cleanup-clients.py
+deactivate
+```
+
+## TODO
+Review this information and put it somewhere visible.
