@@ -77,7 +77,7 @@ append_if_missing_prefix() {
     local var_name=$(echo "$line" | cut -d '=' -f 1)
 
     if ! grep -q "^$var_name" "$file"; then
-        echo "$before$line" >> "$file"
+        echo -e "$before$line" >> "$file"
         echo "Added line to $file: $line"
     else
         echo "Variable '$var_name' already defined in $file"
