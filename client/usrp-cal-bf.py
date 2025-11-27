@@ -1080,15 +1080,20 @@ def main():
         quit_event.set()
 
     finally:
-        # Allow threads and streams to close properly
-        time.sleep(1)
+        quit_event.set()  # Signal all threads to stop
+
+        # Wait for any threads we created to finish
+        for t in threading.enumerate():
+            if t.name in ["TX_thread", "RX_thread", "TX_META_thread"]:
+                t.join(timeout=2)
+
         # Explicit cleanup
-        if 'tx_streamer' in locals():
-            del tx_streamer
-        if 'rx_streamer' in locals():
-            del rx_streamer
-        if 'usrp' in locals():
-            del usrp
+        del tx_streamer
+        del rx_streamer
+        del usrp
+        
+        # Allow threads and streams to close properly
+        time.sleep(0.5)
         print("OK")
         sys.exit(0)
 
