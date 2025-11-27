@@ -14,6 +14,8 @@
       - uhd-host
       - cmake
       - libboost-all-dev
+      - python3-scipy
+      - python3-zmq
 
   tasks:
     - name: Update apt cache

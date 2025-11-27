@@ -33,4 +33,8 @@ echo "pip: $(pip --version)"
 
 pip install ansible-runner
 pip install ansible-core
+pip install zmq
+pip install pyvisa
+pip install numpy
+pip install scipy
 # add other python packages you might need

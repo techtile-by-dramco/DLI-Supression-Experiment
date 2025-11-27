@@ -1067,7 +1067,7 @@ def main():
             long_time=False, # Set long_time True if you want to transmit longer than 10 seconds
         )
 
-        print("DONE")
+        print("DONE - OK")
 
     except Exception as e:
         # Handle any exception gracefully
@@ -1078,6 +1078,15 @@ def main():
     finally:
         # Allow threads and streams to close properly
         time.sleep(1)
+        # Explicit cleanup
+        if 'tx_streamer' in locals():
+            tx_streamer.stop()
+            del tx_streamer
+        if 'rx_streamer' in locals():
+            rx_streamer.stop()
+            del rx_streamer
+        if 'usrp' in locals():
+            del usrp
         sys.exit(0)
 
 if __name__ == "__main__":

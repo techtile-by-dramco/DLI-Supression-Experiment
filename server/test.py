@@ -1,3 +1,5 @@
+# file for quickly testing small code snippets
+
 from utils.ansible_utils import get_target_hosts
 import os
 
