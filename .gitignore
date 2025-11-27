@@ -5,6 +5,8 @@ artifacts/*
 client/__pycache__
 client/data
 
+data/*
+
 env
 env/*
 
