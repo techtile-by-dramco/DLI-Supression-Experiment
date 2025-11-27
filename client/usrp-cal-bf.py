@@ -1085,9 +1085,18 @@ def main():
                 t.join(timeout=2)
 
         # Explicit cleanup
-        del tx_streamer
-        del rx_streamer
-        del usrp
+        try:
+            del tx_streamer
+        except Exception as e:
+            logger.warning("Failed to delete tx_streamer: %s", e)
+        try:
+            del rx_streamer
+        except Exception as e:
+            logger.warning("Failed to delete rx_streamer: %s", e)
+        try:
+            del usrp
+        except Exception as e:
+            logger.warning("Failed to delete usrp: %s", e)
         
         # Allow threads and streams to close properly
         time.sleep(0.5)
