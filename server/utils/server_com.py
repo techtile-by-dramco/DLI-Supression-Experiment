@@ -6,7 +6,7 @@ import threading
 from datetime import datetime, timedelta
 
 class Server:
-    def __init__(self, bind="tcp://*:5555", heartbeat_timeout=10):
+    def __init__(self, bind="tcp://*:5678", heartbeat_timeout=10):
         self.ctx = zmq.Context()
         self.sock = self.ctx.socket(zmq.ROUTER)
         self.sock.bind(bind)
@@ -66,22 +66,24 @@ class Server:
                     break
 
                 if self.sock in socks:
-                    try:
-                        identity, raw = self.sock.recv_multipart()
-                        msg = json.loads(raw.decode())
-                    except KeyboardInterrupt:
-                        self.running = False
-                        break
+                    frames = self.sock.recv_multipart()
+                    if not frames:
+                        continue
 
-                    now = datetime.utcnow()
-                    self.clients[identity] = {"last_seen": now}
+                    identity, *payload = frames
 
-                    if msg["type"] == "register":
-                        print(f"[REGISTER] {identity.decode()}")
-                    elif msg["type"] == "heartbeat":
+                    # First payload frame is the message type
+                    msg_type = payload[0].decode() if len(payload) >= 1 else ""
+                    msg_payload = payload[1:] if len(payload) > 1 else []
+
+                    # Update last_seen
+                    self.clients[identity] = {"last_seen": datetime.utcnow()}
+
+                    # Handle messages
+                    if msg_type == "heartbeat":
                         print(f"[HEARTBEAT] {identity.decode()}")
-                    elif msg["type"] == "response":
-                        print(f"[RESPONSE] {identity.decode()}: {msg}")
+                    elif msg_type == "response":
+                        print(f"[RESPONSE] {identity.decode()}: {msg_payload}")
 
                 self.purge_dead()
 
