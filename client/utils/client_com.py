@@ -21,10 +21,11 @@ class Client:
         self.heartbeat_interval = experiment_settings.get("heartbeat_interval", 5)
 
         # Derive ID from hostname
-        hostname = socket.gethostname()
-        m = re.match(r"rpi-(.+)", hostname, re.IGNORECASE)
+        _hostname = socket.gethostname()
+        m = re.match(r"rpi-(.+)", _hostname, re.IGNORECASE)
         if not m:
-            raise ValueError(f"Hostname '{hostname}' does not match expected pattern 'rpi-<ID>'")
+            raise ValueError(f"Hostname '{_hostname}' does not match expected pattern 'rpi-<ID>'")
+        self.hostname = socket.gethostname()[4:]
         self.client_id = m.group(1).encode()
 
         # State
