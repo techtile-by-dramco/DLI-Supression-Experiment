@@ -1,21 +1,21 @@
-''' ____  ____      _    __  __  ____ ___
-   |  _ \|  _ \    / \  |  \/  |/ ___/ _ \
-   | | | | |_) |  / _ \ | |\/| | |  | | | |
-   | |_| |  _ <  / ___ \| |  | | |__| |_| |
-   |____/|_| \_\/_/   \_\_|  |_|\____\___/
-                             research group
-                               dramco.be/
-  
-     KU Leuven - Technology Campus Gent,
-     Gebroeders De Smetstraat 1,
-     B-9000 Gent, Belgium
-  
-           File: run_server.py
-        Created: 2025-12-12
-         Author: Geoffrey Ottoy
-  
-    Description: 
-'''
+#  ____  ____      _    __  __  ____ ___
+# |  _ \|  _ \    / \  |  \/  |/ ___/ _ \
+# | | | | |_) |  / _ \ | |\/| | |  | | | |
+# | |_| |  _ <  / ___ \| |  | | |__| |_| |
+# |____/|_| \_\/_/   \_\_|  |_|\____\___/
+#                           research group
+#                             dramco.be/
+# 
+#    KU Leuven - Technology Campus Gent,
+#    Gebroeders De Smetstraat 1,
+#    B-9000 Gent, Belgium
+# 
+#          File: run_server.py
+#       Created: 2025-12-12
+#        Author: Geoffrey Ottoy
+# 
+#   Description: 
+#
 
 from utils.server_com import Server
 import signal
@@ -99,40 +99,67 @@ def handle_tx_done(from_host, args):
         if h == from_host:
             tx_status[h]['tx-done'] = True
 
+# ---------------------------------------------------------
+# Main execution block
+# ---------------------------------------------------------
 if __name__ == "__main__":
+if __name__ == "__main__":
+    # Register the "tx-done" callback with the server
     server.on("tx-done", handle_tx_done)
-    server.start()   # <-- non-blocking
+
+    # Start the server in a background thread (non-blocking)
+    server.start()
     print("Server running in background thread.")
 
+    # Retrieve experiment duration from settings (default to 10s)
     duration = experiment_settings.get("duration", 10)
 
-    # Main thread idle loop
+    # ---------------------------------------------------------
+    # Main loop: monitor client connections and manage transmissions
+    # ---------------------------------------------------------
     try:
         while server.running:
+            # Get currently connected clients from the server
             connected_clients = server.get_connected()
+
+            # Check which hosts in tx_status are missing from the connected clients
             missing = [h for h in tx_status if h.encode() not in connected_clients]
+
             if missing:
+                # If some hosts are not connected, print waiting message
                 print("Waiting on hosts:", missing)
-                # Make sure all are set to "tx-done"
+
+                # Ensure all tx-done flags are set to True
+                # (i.e., no ongoing transmission)
                 for h in tx_status:
                     tx_status[h]['tx-done'] = True
+
+                # Sleep briefly before checking again
                 time.sleep(1)
             else:
-                # all hosts in tx_status are seen by the server
+                # All hosts are connected, check if all transmissions are done
                 all_done = all(v["tx-done"] for v in tx_status.values())
 
-                if all_done: # restart tx
+                if all_done:
+                    # All hosts are ready for the next transmission
                     print("All hosts are ready")
                     print(f" -> tx-start with duration = {duration} s")
+
+                    # Reset tx-done flags to False before starting a new transmission
                     for h in tx_status:
                         tx_status[h]['tx-done'] = False
+
+                    # Broadcast "tx-start" message to all clients with the duration
                     if server.running:
                         server.broadcast("tx-start", f"duration={duration}")
                     else:
-                        print("server not running")
+                        print("Server not running.")
+                        
     except KeyboardInterrupt:
+        # Catch Ctrl+C in main thread for clean shutdown
         pass
 
+    # Stop and join the server thread before exiting
     server.stop()
     server.join()
     print("Server terminated.")

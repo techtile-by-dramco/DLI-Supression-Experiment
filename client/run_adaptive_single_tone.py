@@ -18,11 +18,15 @@ args = parser.parse_args()
 with open(args.config_file, "r") as f:
     experiment_settings = yaml.safe_load(f)
     
-frequency = experiment_settings.get("frequency", 920e6)
-channel = experiment_settings.get("channel", 0)
-gain = experiment_settings.get("gain", 80)
-rate = experiment_settings.get("rate", 250e3)
-duration = experiment_settings.get("duration", 10)
+try:
+    frequency = float(experiment_settings.get("frequency", 920e6))
+    channel = int(experiment_settings.get("channel", 0))
+    gain = float(experiment_settings.get("gain", 80))
+    rate = float(experiment_settings.get("rate", 250e3))
+    duration = int(experiment_settings.get("duration", 10))
+except ValueError as e:
+    print("Could not read all settings:", e)
+    sys.exit(-1)
 
 
 client = None 
