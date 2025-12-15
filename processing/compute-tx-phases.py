@@ -6,8 +6,9 @@ from matplotlib.patches import Rectangle
 
 
 #################### CONFIGURATIONS ####################
-output_path_benchmark = "../client/tx-phases-benchmark.yml"
-output_path_friis = "../client/tx-phases-friis.yml"
+output_path_benchmark = "../client/tx-weights-benchmark.yml"
+output_path_friis = "../client/tx-weights-friis.yml"
+AMPLTIUDE = 0.8
 ########################################################
 
 
@@ -22,14 +23,6 @@ config = yaml.safe_load(content)
 
 antennas = dict()
 
-for c in config["antennes"]:
-    # only one antenna is used
-    ch = c["channels"][1]
-    tile = c["tile"]
-    antennas[tile] = {
-        "pos" : [ch["x"], ch["y"], ch["z"]],
-        "tx_phase": 0
-    }
 
 # UE position (energy neutral device)
 target_location = np.array([3.181, 1.774, 0.266])
@@ -39,24 +32,26 @@ f = 920e6  # Antenna frequency (Hz)
 c = 3e8  # Speed of light (m/s)
 lambda_ = c / f  # Wavelength (m)
 
-with open(output_path_friis, "w") as f:
+out_dict = dict()
 
-    for tile_name, a in antennas.items():
-        d_EN = np.linalg.norm(a["pos"] - target_location)  # Scalar distances (L x 1)
+for c in config["antennes"]:
+    # only one antenna is used
+    ch1 = c["channels"][1]
+    ch0 = c["channels"][0]
+    tile_name = c["tile"]
+    out_dict[tile_name] = []
+    for ch in c["channels"]:
+        pos = [ch["x"], ch["y"], ch["z"]]
+        phase = 0
+        ampl = AMPLTIUDE
+        d_EN = np.linalg.norm(pos - target_location)  # Scalar distances (L x 1)
 
-        # True channel vector to the device
-        # h = lambda_  / (np.sqrt(4 * np.pi) * d_EN) * np.exp(-1j * 2 * np.pi / lambda_ * d_EN)
-
-        # NOTE I removed the power contribution, as only the phases are used.
         h = np.exp(-1j * 2 * np.pi / lambda_ * d_EN)
 
         # MRT weights
         w = np.conj(h)
+        out_dict[tile_name].append({"ch":0, "ampl": float(AMPLTIUDE), "phase": float(np.angle(w))})
 
-        antennas[tile_name]["tx_phase"] = np.rad2deg(np.angle(w))
-        f.write(f'{tile_name}: {antennas[tile_name]["tx_phase"]}\n')
+with open(output_path_friis, "w", encoding="utf-8") as f:
+    yaml.safe_dump(out_dict, f, sort_keys=False)
 
-
-with open(output_path_benchmark, "w") as f:
-    for tile_name, a in antennas.items():
-        f.write(f'{tile_name}: {0.0}\n')
