@@ -6,10 +6,12 @@ import threading
 from datetime import datetime, timedelta
 
 class Server:
-    def __init__(self, bind="tcp://*:5678", heartbeat_timeout=10, silent=False):
-        self.ctx = zmq.Context()
-        self.sock = self.ctx.socket(zmq.ROUTER)
-        self.sock.bind(bind)
+    def __init__(self, msg_port="5678", sync_port="5679", heartbeat_timeout=10, silent=False):
+        self.context = zmq.Context()
+        self.messaging = self.context.messaginget(zmq.ROUTER)
+        self.messaging.bind("tcp://*:" + msg_port)
+        self.sync = self.context.socket(zmq.PUB)
+        self.sync.bind("tcp://*:" + sync_port)
         self.clients = {}
         self.heartbeat_timeout = heartbeat_timeout
         self.silent = silent
@@ -38,12 +40,13 @@ class Server:
         print("\nShutting down server...")
 
         try:
-            self.sock.close(linger=0)
+            self.messaging.close(linger=0)
+            self.sync.close(linger=0)
         except Exception:
             pass
 
         try:
-            self.ctx.term()
+            self.context.term()
         except Exception:
             pass
 
@@ -53,12 +56,12 @@ class Server:
         print("Server running... waiting for clients (Ctrl+C or Ctrl+Z to stop)")
 
         poller = zmq.Poller()
-        poller.register(self.sock, zmq.POLLIN)
+        poller.register(self.messaging, zmq.POLLIN)
 
         try:
             while self.running:
                 try:
-                    socks = dict(poller.poll(1000))  # may be interrupted
+                    messagings = dict(poller.poll(1000))  # may be interrupted
                 except zmq.error.ZMQError:
                     break
                 except KeyboardInterrupt:
@@ -66,8 +69,8 @@ class Server:
                     self.running = False
                     break
 
-                if self.sock in socks:
-                    frames = self.sock.recv_multipart()
+                if self.messaging in messagings:
+                    frames = self.messaging.recv_multipart()
                     if not frames:
                         continue
 
@@ -150,19 +153,14 @@ class Server:
                 frame = frame.encode()
             frames.append(frame)
 
-        self.sock.send_multipart(frames)
+        self.messaging.send_multipart(frames)
 
-    def broadcast(self, msg_type, *payload_frames):
-        """
-        Send a message to all currently connected clients.
+def broadcast(self, msg_type, *payload_frames):
+    frames = [msg_type.encode()]
 
-        Parameters
-        ----------
-        msg_type : str
-            Message type string.
-        payload_frames : list of bytes or str
-            Optional frames after the message type.
-        """
-        for cid in list(self.clients.keys()):
-            print("sending to", cid)
-            self.send(cid, msg_type, *payload_frames)
+    for f in payload_frames:
+        if isinstance(f, str):
+            f = f.encode()
+        frames.append(f)
+
+    self.sync.send_multipart(frames)

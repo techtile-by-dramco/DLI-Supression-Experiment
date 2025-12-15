@@ -10,11 +10,14 @@ class Client:
     def __init__(self, config_path="client_config.yaml"):
         # Load YAML config
         with open(config_path, "r") as f:
-            cfg = yaml.safe_load(f)
+            experiment_settings = yaml.safe_load(f)
 
-        host = cfg["server"]["host"]
-        port = cfg["server"]["port"]
-        self.server_endpoint = f"tcp://{host}:{port}"
+        server_settings = experiment_settings.get("server", "")
+        host = server_settings.get("host", "")
+        messaging_port = server_settings.get("messaging_port", "")
+        sync_port = server_settings.get("sync_port", "")
+        self.messaging_endpoint = f"tcp://{host}:{messaging_port}"
+        self.sync_endpoint = f"tcp://{host}:{sync_port}"
         self.heartbeat_interval = cfg.get("heartbeat_interval", 5)
 
         # Derive ID from hostname
@@ -30,15 +33,18 @@ class Client:
 
         # Setup ZMQ
         self.context = zmq.Context()
-        self.socket = self.context.socket(zmq.DEALER)
-        self.socket.setsockopt(zmq.IDENTITY, self.client_id)
+        self.messaging = self.context.socket(zmq.DEALER)
+        self.messaging.setsockopt(zmq.IDENTITY, self.client_id)
+
+        self.sync = self.ctx.socket(zmq.SUB)
+        self.sync.setsockopt_string(zmq.SUBSCRIBE, "")  # subscribe to all topics
 
         # Robust reconnection handling
-        self.socket.setsockopt(zmq.RECONNECT_IVL, 1000)        # retry every 1s
-        self.socket.setsockopt(zmq.RECONNECT_IVL_MAX, 5000)    # up to 5s backoff
-        self.socket.setsockopt(zmq.HEARTBEAT_IVL, 3000)        # client heartbeats to server
-        self.socket.setsockopt(zmq.HEARTBEAT_TIMEOUT, 10000)
-        self.socket.setsockopt(zmq.HEARTBEAT_TTL, 30000)
+        self.messaging.setsockopt(zmq.RECONNECT_IVL, 1000)        # retry every 1s
+        self.messaging.setsockopt(zmq.RECONNECT_IVL_MAX, 5000)    # up to 5s backoff
+        self.messaging.setsockopt(zmq.HEARTBEAT_IVL, 3000)        # client heartbeats to server
+        self.messaging.setsockopt(zmq.HEARTBEAT_TIMEOUT, 10000)
+        self.messaging.setsockopt(zmq.HEARTBEAT_TTL, 30000)
         
         # Event handling
         self.callbacks = {}
@@ -49,7 +55,8 @@ class Client:
         self.running = True
 
         # Connect (non-blocking even if server is DOWN)
-        self.socket.connect(self.server_endpoint)
+        self.messaging.connect(self.messaging_endpoint)
+        self.sync.connect(self.sync_endpoint)
 
         # Launch background thread
         self.thread = threading.Thread(target=self._run, daemon=True)
@@ -59,7 +66,8 @@ class Client:
         self.running = False
 
         try:
-            self.socket.close(0)
+            self.messaging.close(0)
+            self.sync.close(0)
         except:
             pass
         try:
@@ -93,11 +101,12 @@ class Client:
                 frame = frame.encode()
             frames.append(frame)
 
-        self.socket.send_multipart(frames)
+        self.messaging.send_multipart(frames)
 
     def _run(self):
         poller = zmq.Poller()
-        poller.register(self.socket, zmq.POLLIN)
+        poller.register(self.messaging, zmq.POLLIN)
+        poller.register(self.sync, zmq.POLLIN)
 
         last_heartbeat = 0
 
@@ -107,7 +116,7 @@ class Client:
             # Send heartbeat (non-blocking)
             if now - last_heartbeat >= self.heartbeat_interval:
                 try:
-                    self.socket.send_multipart([b"heartbeat", b"alive"], zmq.NOBLOCK)
+                    self.messaging.send_multipart([b"heartbeat", b"alive"], zmq.NOBLOCK)
                 except zmq.Again:
                     # Server not reachable yet — this is fine
                     pass
@@ -115,13 +124,23 @@ class Client:
 
             # Poll server messages
             try:
-                events = dict(poller.poll(timeout=500))
+                events = dict(poller.poll(timeout=100))
             except zmq.error.ZMQError:
                 break
 
-            if self.socket in events:
+            if self.messaging in events:
                 try:
-                    frames = self.socket.recv_multipart(zmq.NOBLOCK)
+                    frames = self.messaging.recv_multipart(zmq.NOBLOCK)
+                except zmq.Again:
+                    continue
+                except zmq.ZMQError:
+                    break
+
+                self._handle_server_message(frames)
+                
+            if self.sync in events:
+                try:
+                    frames = self.sync.recv_multipart(zmq.NOBLOCK)
                 except zmq.Again:
                     continue
                 except zmq.ZMQError:
