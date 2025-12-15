@@ -56,7 +56,7 @@ if __name__ == "__main__":
     server.start()   # <-- non-blocking
     print("Server running in background thread.")
 
-    duration = 3
+    duration = 10
 
     # Main thread idle loop
     try:
@@ -65,6 +65,9 @@ if __name__ == "__main__":
             missing = [h for h in tx_status if h.encode() not in connected_clients]
             if missing:
                 print("Waiting on hosts:", missing)
+                # Make sure all are set to "tx-done"
+                for h in tx_status:
+                    tx_status[h]['tx-done'] = True
                 time.sleep(1)
             else:
                 # all hosts in tx_status are seen by the server

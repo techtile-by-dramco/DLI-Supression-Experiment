@@ -8,9 +8,9 @@ import uhd
 import numpy as np
 
 
-frequency = 917e6
+frequency = 920e6
 channel = 0
-gain = 40
+gain = 80
 rate = 250e3
 duration = 10
 
