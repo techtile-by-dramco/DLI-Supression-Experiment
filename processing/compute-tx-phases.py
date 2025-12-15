@@ -48,11 +48,11 @@ for c in config["antennes"]:
 
     # MRT weights
     w = np.conj(h)
-    out_dict[tile_name].append({"ch":1, "ampl": float(AMPLTIUDE), "phase": float(np.rad2deg(np.angle(w)))})
     # CH 0 should be zero in this case
-    out_dict[tile_name].append(
-        {"ch": 0, "ampl": float(0.0), "phase": float(0.0)}
-    )
+    out_dict[tile_name].append({"ch": 0, "ampl": float(0.0), "phase": float(0.0)})
+
+    out_dict[tile_name].append({"ch":1, "ampl": float(AMPLTIUDE), "phase": float(np.rad2deg(np.angle(w)))})
+
 
 with open(output_path_friis, "w", encoding="utf-8") as f:
     yaml.safe_dump(out_dict, f, sort_keys=False)
