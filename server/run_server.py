@@ -6,17 +6,21 @@ import sys
 import yaml
 import config
 
-# We start by setting some paths
+# ---------------------------------------------------------
+# Set up paths and configuration
+# ---------------------------------------------------------
+# Construct the path to the experiment settings YAML file
 settings_path = os.path.join(config.PROJECT_DIR, "experiment-settings.yaml")
 
-# Output some general information before we start
-print("Experiment project directory: ", config.PROJECT_DIR) # should point to tile-management repo clone
+# Output general info about project location
+print("Experiment project directory: ", config.PROJECT_DIR)  # Should point to tile-management repo clone
 
-# Check if the tile-management repo is in the default location (no use in continuing if it's not)
+# Check if the tile-management repository exists in the expected location
+# Exit with an error code if not
 if not config.check_tile_management_repo():
     sys.exit(config.ERRORS["REPO_ERROR"])
 
-# Import code from the tile-management repo
+# Add utils directory to the system path to import additional helper functions
 sys.path.append(config.UTILS_DIR)
 from ansible_utils import get_target_hosts, run_playbook
 
