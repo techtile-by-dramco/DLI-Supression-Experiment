@@ -1,4 +1,5 @@
-from utils.client_com import Client
+# from utils.client_com import Client
+from utils.client_com import *
 import signal
 import time
 import sys
