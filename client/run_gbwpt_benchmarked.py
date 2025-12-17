@@ -1035,13 +1035,13 @@ def main():
         # -------------------------------------------------------------------------
         # STEP 4: Add additional phase to ensure right measurement with the scope
         # -------------------------------------------------------------------------
-        phi_offset = 0
+        phi_BF = 0
         with open(os.path.join(os.path.dirname(__file__), "tx-phases-benchmark.yml"), "r") as phases_yaml:
             try:
                 phases_dict = yaml.safe_load(phases_yaml)
                 if HOSTNAME in phases_dict.keys():
-                    phi_cable = phases_dict[HOSTNAME]
-                    logger.debug(f"Applying BF phase: {phi_offset}")
+                    phi_BF = phases_dict[HOSTNAME]
+                    logger.debug(f"Applying BF phase: {phi_BF}")
                 else:
                     logger.error("Phase offset not found in tx-phases-benchmark.yml")
             except yaml.YAMLError as exc:
@@ -1058,9 +1058,9 @@ def main():
         alive_socket.close()
 
 
-        logger.info("LB: %f, CABLE: %f, BF PHASE: %f", np.rad2deg(phi_LB), phi_cable, phi_offset)
+        logger.info("LB: %f, CABLE: %f, BF PHASE: %f", np.rad2deg(phi_LB), phi_cable, phi_BF)
 
-        phase_corr= phi_LB - np.deg2rad(phi_cable) + np.deg2rad(phi_offset)
+        phase_corr= phi_LB - np.deg2rad(phi_cable) + np.deg2rad(phi_BF)
         logger.info("Phase correction in rad: %s", phase_corr)
         logger.info("Phase correction in degrees: %s", np.rad2deg(phase_corr))
 
