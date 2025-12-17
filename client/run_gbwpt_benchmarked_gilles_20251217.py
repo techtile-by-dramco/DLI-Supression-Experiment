@@ -31,6 +31,7 @@ RX_GAIN = 22              # Empirically determined receive gain (22 dB without s
 CAPTURE_TIME = 10         # Duration of each capture in seconds
 FREQ = 0                  # Base frequency offset (Hz); 0 means use default center frequency
 # server_ip = "10.128.52.53"  # Optional remote server address (commented out)
+server_ip = "10.128.48.3"  
 meas_id = 0               # Measurement identifier
 exp_id = 0                # Experiment identifier
 # =============================================================================
@@ -49,7 +50,7 @@ iq_socket.bind(f"tcp://*:{50001}")
 
 HOSTNAME = socket.gethostname()[4:]
 file_open = False
-server_ip = None  # populated by settings.yml
+# server_ip = None  # populated by settings.yml
 
 # =============================================================================
 #                           Custom Log Formatter
@@ -906,6 +907,9 @@ def parse_arguments():
         required=False,
     )
 
+    parser.add_argument("--config-file", type=str)
+
+
     # Parse the command-line arguments
     args = parser.parse_args()
 
@@ -961,7 +965,7 @@ def main():
         quit_event = threading.Event()
 
         margin = 5.0                     # Safety margin for timing
-        cmd_time = CAPTURE_TIME + margin # Duration for one measurement step
+        cmd_time = margin # Duration for one measurement step
         start_next_cmd = cmd_time        # Timestamp for the next scheduled command
 
         # Queue to collect measurement results and communicate between threads
@@ -1008,10 +1012,10 @@ def main():
         phi_LB = result_queue.get()
 
         # Print loopback phase
-        logger.info("Phase pilot reference signal in rad: %s", phi_LB)
-        logger.info("Phase pilot reference signal in degrees: %s", np.rad2deg(phi_LB))
+        logger.info("Phase LB reference signal in rad: %s", phi_LB)
+        logger.info("Phase LB reference signal in degrees: %s", np.rad2deg(phi_LB))
 
-        start_next_cmd += cmd_time + 2.0  # Schedule next command
+        start_next_cmd += cmd_time + 2.0 + CAPTURE_TIME # Schedule next command
 
         # -------------------------------------------------------------------------
         # STEP 3: Load cable phase correction from YAML configuration (if available)
@@ -1022,7 +1026,7 @@ def main():
                 phases_dict = yaml.safe_load(phases_yaml)
                 if HOSTNAME in phases_dict.keys():
                     phi_cable = phases_dict[HOSTNAME]
-                    logger.debug(f"Applying phase correction: {phi_cable}")
+                    logger.debug(f"Applying cable phase correction: {phi_cable}")
                 else:
                     logger.error("Phase offset not found in ref-RF-cable.yml")
             except yaml.YAMLError as exc:
@@ -1031,13 +1035,13 @@ def main():
         # -------------------------------------------------------------------------
         # STEP 4: Add additional phase to ensure right measurement with the scope
         # -------------------------------------------------------------------------
-        phi_offset = 0
+        phi_BF = 0
         with open(os.path.join(os.path.dirname(__file__), "tx-phases-benchmark.yml"), "r") as phases_yaml:
             try:
                 phases_dict = yaml.safe_load(phases_yaml)
                 if HOSTNAME in phases_dict.keys():
-                    phi_offset = phases_dict[HOSTNAME]
-                    logger.debug(f"Applying phase correction: {phi_offset}")
+                    phi_BF = phases_dict[HOSTNAME]
+                    logger.debug(f"Applying BF phase: {phi_BF}")
                 else:
                     logger.error("Phase offset not found in tx-phases-benchmark.yml")
             except yaml.YAMLError as exc:
@@ -1053,7 +1057,10 @@ def main():
         alive_socket.send_string(f"{HOSTNAME} TX")
         alive_socket.close()
 
-        phase_corr=phi_LB - np.deg2rad(phi_cable) + np.deg2rad(phi_offset)
+
+        logger.info("LB: %f, CABLE: %f, BF PHASE: %f", np.rad2deg(phi_LB), phi_cable, phi_BF)
+
+        phase_corr= phi_LB - np.deg2rad(phi_cable) + np.deg2rad(phi_BF)
         logger.info("Phase correction in rad: %s", phase_corr)
         logger.info("Phase correction in degrees: %s", np.rad2deg(phase_corr))
 
@@ -1062,9 +1069,9 @@ def main():
             tx_streamer,
             quit_event,
             # phase_corr=phi_LB + phi_P + np.deg2rad(phi_cable),
-            phase_corr=phi_LB - np.deg2rad(phi_cable) + np.deg2rad(phi_offset),
+            phase_corr=phase_corr,
             at_time=start_next_cmd,
-            long_time=False, # Set long_time True if you want to transmit longer than 10 seconds
+            long_time=True, # Set long_time True if you want to transmit longer than 10 seconds
         )
 
         print("DONE")
