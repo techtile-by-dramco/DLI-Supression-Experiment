@@ -14,6 +14,16 @@ import zmq
 import queue
 
 # =============================================================================
+# IS NOT USED HERE, BUT REQUIRED TO WORK WITH THE NEW WAY OF RUNNING EXPERIMENTS
+"""Parse the command line arguments"""
+parser = argparse.ArgumentParser()
+parser.add_argument("--config-file", type=str)
+
+args = parser.parse_args()
+# =============================================================================
+
+
+# =============================================================================
 #                           Experiment Configuration
 # =============================================================================
 # This section defines the default settings and timing parameters
