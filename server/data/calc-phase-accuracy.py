@@ -33,12 +33,6 @@ all_phase_diffs = np.concatenate([
 print(f"Aantal metingen: {len(all_phase_diffs)}")
 # print(all_phase_diffs)
 
-
-# Standaardafwijking berekenen
-# std_CH2 = np.std(phase_diff_CH2, ddof=1)
-# std_CH3 = np.std(phase_diff_CH3, ddof=1)
-# std_CH4 = np.std(phase_diff_CH4, ddof=1)
-
 std = np.std(all_phase_diffs, ddof=1)
 
 print(f"Std (deg): {std:.3f}°")
