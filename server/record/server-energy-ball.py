@@ -282,14 +282,16 @@ try:
                 current_max_power = collect_power(next_tx_in)
 
                 stronger = current_max_power > max_power
-                prev_power = current_max_power
+                if stronger: max_power = current_max_power
 
                 print(
-                    f"Iteration {i}: max_power={max_power} prev_power={prev_power} stronger={stronger}"
+                    f"Iteration {i}: max_power={max_power} now_power = {current_max_power} prev_power={prev_power} stronger={stronger}"
                 )
 
+                prev_power = current_max_power
+
                 f.write(f"      - iter: {i}\n")
-                f.write(f"        max_power_pw: {max_power}\n")
+                f.write(f"        power_pw: {current_max_power}\n")
                 f.write("        clients:\n")
                 for host, applied_phase, applied_delta in tx_updates:
                     f.write(f"          - host: {host}\n")
