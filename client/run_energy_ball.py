@@ -1134,7 +1134,7 @@ def main():
             prev_phase = applied_phase
 
             logger.debug("Sending TX DONE MODE")
-            start_next_cmd += CAPTURE_TIME + margin
+            start_next_cmd += CAPTURE_TIME + 2*margin
             alive_socket.send_string(
                 f"{HOSTNAME} {applied_phase} {applied_delta} {delta(usrp, start_next_cmd):.2f}"
             )
