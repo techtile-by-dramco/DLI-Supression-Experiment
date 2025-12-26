@@ -3,6 +3,8 @@
 
 # VALUE "num_subscribers" --> IMPORTANT --> The server waits until all subscribers have sent their "alive" or ready message before starting a measurement.
 
+# to kill it: sudo fuser -k 5557/tcp
+
 import zmq
 import time
 import sys
