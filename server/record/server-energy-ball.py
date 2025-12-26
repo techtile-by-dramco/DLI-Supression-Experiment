@@ -281,8 +281,9 @@ try:
 
                 current_max_power = collect_power(next_tx_in)
 
-                stronger = current_max_power > max_power
-                if stronger: max_power = current_max_power
+                stronger = current_max_power > prev_power
+
+                max_power = max(max_power, current_max_power)
 
                 print(
                     f"Iteration {i}: max_power={max_power} now_power = {current_max_power} prev_power={prev_power} stronger={stronger}"
