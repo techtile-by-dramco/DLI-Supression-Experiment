@@ -945,7 +945,7 @@ def get_next_phase(
     u = prev_delta if stronger else 0.0
 
     applied_delta = np.random.choice([-delta_phi, delta_phi])
-    next_phase = current_phase + u + applied_delta
+    next_phase = float(current_phase + u + applied_delta)
 
     return next_phase, applied_delta
 
