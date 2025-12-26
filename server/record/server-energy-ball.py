@@ -273,15 +273,16 @@ try:
                 break
             stronger = False
             prev_power = 0.0
+            max_power = 0.0
             f.write("    iterations:\n")
 
             for i in range(0, 100):
                 next_tx_in, tx_updates = wait_till_tx_done(is_stronger=stronger)
 
-                max_power = collect_power(next_tx_in)
+                current_max_power = collect_power(next_tx_in)
 
-                stronger = max_power > prev_power
-                prev_power = max_power
+                stronger = current_max_power > max_power
+                prev_power = current_max_power
 
                 print(
                     f"Iteration {i}: max_power={max_power} prev_power={prev_power} stronger={stronger}"
