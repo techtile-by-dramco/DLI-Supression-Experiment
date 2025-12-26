@@ -870,8 +870,8 @@ def tx_phase_coh(usrp, tx_streamer, quit_event, phase_corr, at_time, long_time=T
     # Start the metadata monitoring thread
     tx_meta_thr = tx_meta_thread(tx_streamer, quit_event)
 
-    # Send USRP is in TX mode for scope measurements
-    send_usrp_in_tx_mode(SERVER_IP)
+    # # Send USRP is in TX mode for scope measurements
+    # send_usrp_in_tx_mode(SERVER_IP)
 
     # Allow transmission to continue for the configured duration
     if long_time:
