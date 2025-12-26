@@ -889,7 +889,8 @@ def tx_phase_coh(usrp, tx_streamer, quit_event, phase_corr, at_time, long_time=T
 
     logger.debug("Transmission completed successfully")
 
-    return tx_thr, tx_meta_thr
+    tx_thr = None 
+    tx_meta_thr = None
 
 
 def parse_arguments():
