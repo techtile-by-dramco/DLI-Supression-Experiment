@@ -889,8 +889,7 @@ def tx_phase_coh(usrp, tx_streamer, quit_event, phase_corr, at_time, long_time=T
 
     logger.debug("Transmission completed successfully")
 
-    tx_thr = None 
-    tx_meta_thr = None
+    quit_event.clear()
 
 
 def parse_arguments():
@@ -1123,7 +1122,6 @@ def main():
                 prev_delta=prev_delta
             )
 
-            quit_event = threading.Event()
             tx_phase_coh(
                 usrp,
                 tx_streamer,
