@@ -12,7 +12,7 @@ import sys
 # -------------------------------------------------
 
 DATA_DIR = "../data"
-FOLDER = "sionna0"
+FOLDER = "sionna2"
 
 cmap = "inferno"
 
@@ -21,6 +21,7 @@ zoom_val = 2
 PLOT_LAST_VAL = 10  # number of most recent samples to highlight
 GRID_RESOLUTION = 0.05  # in meters
 LABEL_IN_WAVELENGTHS = False  # False plots labels in absolute meters
+PLOT_DB = False
 
 # Grid cell aggregation functions
 STAT_FUNCS = {
@@ -191,30 +192,31 @@ def plot_heatmaps_for_stat(heatmap, xi, yi, x_bf, y_bf, last_positions, stat_nam
     # Log plot (dB)
     # NOTE: Keeps your original scaling idea; label is generic dB.
     # -----------------------
-    fig, ax = plt.subplots()
-    ax.set_title(f"{stat_name} | dB")
+    if PLOT_DB:
+        fig, ax = plt.subplots()
+        ax.set_title(f"{stat_name} | dB")
 
-    up = upsampled_heatmap.copy()
-    up[up <= 0] = np.nan  # protect log
+        up = upsampled_heatmap.copy()
+        up[up <= 0] = np.nan  # protect log
 
-    img_db = ax.imshow(
-        10 * np.log10(up / 10e3),  # keep your original scaling
-        vmin=-60,
-        vmax=None,
-        cmap=cmap,
-        origin="lower",
-    )
+        img_db = ax.imshow(
+            10 * np.log10(up / 10e3),  # keep your original scaling
+            vmin=-60,
+            vmax=None,
+            cmap=cmap,
+            origin="lower",
+        )
 
-    ax.set_xticks(xtick_pos, labels=xtick_labels)
-    ax.set_yticks(ytick_pos, labels=ytick_labels)
+        ax.set_xticks(xtick_pos, labels=xtick_labels)
+        ax.set_yticks(ytick_pos, labels=ytick_labels)
 
-    cbar = fig.colorbar(img_db)
-    cbar.ax.set_ylabel(f"{stat_name} power [dB]")
+        cbar = fig.colorbar(img_db)
+        cbar.ax.set_ylabel(f"{stat_name} power [dB]")
 
-    ax.set_xlabel(axis_label)
-    ax.set_ylabel(axis_label)
-    fig.tight_layout()
-    plt.show()
+        ax.set_xlabel(axis_label)
+        ax.set_ylabel(axis_label)
+        fig.tight_layout()
+        plt.show()
 
 
 # -------------------------------------------------
