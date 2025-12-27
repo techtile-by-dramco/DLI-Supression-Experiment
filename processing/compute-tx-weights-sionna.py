@@ -19,10 +19,10 @@ from sionna.rt import load_scene
 # CONFIG
 # ============================================================
 # Receiver location (single antenna RX)
-# target_location = np.array([3.181, 1.774, 0.266], dtype=np.float32)
-target_location = np.array(
-    [3.201299560546875, 1.70512451171875, 0.23005308532714844], dtype=np.float32
-)
+target_location = np.array([3.181, 1.774, 0.266], dtype=np.float32)
+# target_location = np.array(
+#     [3.201299560546875, 1.70512451171875, 0.23005308532714844], dtype=np.float32
+# )
 # Specular multipath control
 specular_order = 2  # start with LoS only
 
