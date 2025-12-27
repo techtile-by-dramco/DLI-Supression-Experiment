@@ -132,6 +132,8 @@ try:
         d = rfep.get_data()
         pos = positioner.get_data()
 
+        # print(d, pos)
+
         if d is not None and pos is not None:
             positions.append(pos)
             values.append(d)
