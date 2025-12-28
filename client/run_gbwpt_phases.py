@@ -929,6 +929,9 @@ def parse_arguments():
     # Parse the command-line arguments
     args = parser.parse_args()
 
+    # Log the invocation arguments for traceability
+    logger.info("Invocation args: %s", " ".join(sys.argv))
+
     # If the user provided an IP address, apply it
     if args.ip:
         logger.debug(f"Setting server IP to: {args.ip}")
