@@ -16,26 +16,39 @@ Python tooling to coordinate a geometry-aware wireless power transfer experiment
 - UHD/B210 stack on the tiles (validated by `server/setup-clients.py`).
 
 ## Setup (control node)
-1) Bootstrap the virtualenv and pull tile-management:
+1) Generate the applied TX phases via the Sionna ray-tracing helper (writes `client/tx-weights-sionna.yml` and `client/tx-phases-sionna-<specular_order>SDR.yml`, e.g., the repo and git history currently use the `2SDR` file):
+```
+cd processing
+python compute-tx-weights-sionna.py
+cd ..
+```
+2) Bootstrap the virtualenv and pull tile-management:
 ```
 cd server
 ./setup-server.sh         # clones/updates tile-management and installs deps
 source bin/activate
 ```
-2) Configure `experiment-settings.yaml` with the server host/IP, target tile group(s), RF params (`frequency`, `gain`, `rate`, `duration`), `client_script_name`/`client_script_args`, and any extra apt packages.
-3) Prepare the tiles (apt update/upgrade, install extras, pull repos, check UHD):
+3) Configure `experiment-settings.yaml` with the server host/IP, target tile group(s), RF params (`frequency`, `gain`, `rate`, `duration`), `client_script_name`/`client_script_args`, and any extra apt packages.
+4) Prepare the tiles (apt update/upgrade, install extras, pull repos, check UHD):
 ```
 python server/setup-clients.py --ansible-output
 ```
    Flags: `--skip-apt`, `--repos-only`, `--install-only`, `--check-uhd-only` to narrow the actions.
-4) Push updated experiment code/settings to the tiles:
+5) Push updated experiment code/settings to the tiles:
 ```
 python server/update-experiment.py --ansible-output
 ```
-5) Start or stop the experiment service on the tiles:
+6) Start or stop the experiment service on the tiles:
 ```
 python server/run-clients.py --start   # or --stop
 ```
+
+## Recording measurements
+- Use the energy-profiler recorder to capture position/power traces (defaults track `FOLDER` in `server/record/record-meas-energy-profiler.py`, currently `sionna2SDR` per recent commits):
+```
+python server/record/record-meas-energy-profiler.py
+```
+- Autosaves every `SAVE_EVERY` seconds to `data/<FOLDER>/<timestamp>_{positions,values}.npy` (Qualisys positioning + RFEP power). Update `FOLDER` to start a new series; settings are pulled from `experiment-settings.yaml`.
 
 ## Running an experiment
 - Launch the ZMQ control server on the control node (with the venv active):
@@ -47,6 +60,32 @@ python server/run_server.py
 python client/run_quasi_multi_tone.py --config-file /home/pi/geometry-based-wireless-power-transfer/experiment-settings.yaml
 ```
   Clients wait for `tx-start`, transmit for the requested duration, then reply with `tx-done`.
+
+## Experiment workflows
+- **Fixed-phase transmit (`run_gbwt_phases.py`)**
+  - Uses the phases defined in `settings.yml`.
+  - Requires: `sync-server.py`, the XY plotter (running on TTRPI5), the positioner on the Qualisys server, and `server/record/record-meas-energy-profiler.py`.
+  - Plotting: `processing/plot_all_folders_heatmap.py` or `processing/plot-values-positions-2d.py`.
+
+- **Energy-ball (simulated annealing) transmit**
+  - Phases are iteratively updated via simulated annealing to converge to an optimal point.
+  - Uses the same infrastructure as above (sync server, XY plotter, positioner, recorder).
+  - Plotting: `processing/plot_all_folders_heatmap.py` or `processing/plot-values-positions-2d.py`.
+
+## Plotting and post-processing
+- Per-folder heatmap (set `FOLDER` inside `processing/plot-values-positions-2d.py`, defaults follow the latest measurement series):
+```
+cd processing
+python plot-values-positions-2d.py
+```
+- Aggregate all folders under `data/` into mean-power heatmaps:
+```
+python processing/plot_all_folders_heatmap.py
+```
+- Energy-ball YAML summarizer (prints/plots max power per iteration; input defaults to latest `server/record/data/exp-*.yml`):
+```
+python processing/process-energy-ball.py [path/to/exp-YYYYMMDDHHMMSS.yml]
+```
 
 ## Preparing TX phases
 - `processing/compute-tx-phases.py` fetches the tile geometry from `techtile-description` and generates `client/tx-phases-friis.yml` (phase-aligned) and `client/tx-phases-benchmark.yml` (all zeros). Run it from the repo root:
