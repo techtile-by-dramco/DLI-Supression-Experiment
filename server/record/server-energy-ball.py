@@ -91,7 +91,7 @@ poller.register(
 # Track time of the last received message
 
 # Maximum time to wait for messages before breaking out of the inner loop (10 minutes)
-WAIT_TIMEOUT = 2.0
+WAIT_TIMEOUT = 10.0
 
 # Inform the user that the experiment is starting
 logger.info("Starting experiment: %s", unique_id)
