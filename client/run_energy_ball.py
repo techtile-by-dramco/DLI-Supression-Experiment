@@ -1143,7 +1143,16 @@ def main():
             logger.debug("Received from server: %s", rx_stronger)
             stronger = rx_stronger.lower().strip() == "true"
 
-        print("DONE")
+        print("DONE ENERGY BALL transmission.")
+        print("STARTING LONG TRANSMISSION WITH LAST PHASES.")
+        tx_phase_coh(
+            usrp,
+            tx_streamer,
+            quit_event,
+            phase_corr=applied_phase,
+            at_time=start_next_cmd,
+            long_time=True,  # Set long_time True if you want to transmit longer than 10 seconds
+        )
 
     except Exception as e:
         # Handle any exception gracefully
