@@ -5,6 +5,7 @@
 
 # to kill it: sudo fuser -k 5557/tcp
 
+import logging
 import zmq
 import time
 import sys
@@ -23,6 +24,13 @@ alive_port = "5558"  # Port used for heartbeat/alive messages.
 data_port = "5559"  # Port used for data transmission.
 # =============================================================================
 # =============================================================================
+
+# Logging setup
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+logger.addHandler(handler)
 
 if len(sys.argv) > 1:
     delay = int(sys.argv[1])
@@ -67,7 +75,7 @@ poller.register(
 WAIT_TIMEOUT = 2.0
 
 # Inform the user that the experiment is starting
-print(f"Starting experiment: {unique_id}")
+logger.info("Starting experiment: %s", unique_id)
 
 # Path setup for repo imports and data output
 current_file_path = os.path.abspath(__file__)
@@ -84,16 +92,22 @@ settings = read_yaml_file("experiment-settings.yaml")
 rfep = RFEP(settings["ep"]["ip"], settings["ep"]["port"])
 
 
-print(rfep.get_data())
+logger.info("Initial RFEP data: %s", rfep.get_data())
 
 CAPTURE_POWER_TIME = 5
 prev_power = 0
 stop_requested = False
 
 # Log where the server is bound
-print(
-    f"Server listening on host '{host}' (sync tcp://{host}:{sync_port}, "
-    f"alive tcp://{host}:{alive_port}, data tcp://{host}:{data_port})"
+logger.info(
+    "Server listening on host '%s' (sync tcp://%s:%s, alive tcp://%s:%s, data tcp://%s:%s)",
+    host,
+    host,
+    sync_port,
+    host,
+    alive_port,
+    host,
+    data_port,
 )
 
 def _handle_interrupt(signum=None, frame=None):
@@ -137,7 +151,7 @@ def send_sync():
             messages_received += 1
 
             # Print received message and write it to the YAML file
-            print(f"{_message} ({messages_received}/{num_subscribers})")
+            logger.info("%s (%d/%d)", _message, messages_received, num_subscribers)
             f.write(f"     - {_message}\n")
 
             # Process the request (example placeholder)
@@ -147,7 +161,7 @@ def send_sync():
             alive_socket.send_string(response)
 
     # Wait a fixed delay before sending the next SYNC signal
-    print(f"sending 'SYNC' message in {delay}s...")
+    logger.info("sending 'SYNC' message in %ss...", delay)
     f.flush()
     time.sleep(delay)
 
@@ -156,7 +170,7 @@ def send_sync():
 
     # Broadcast synchronization message to all subscribers
     sync_socket.send_string(f"{meas_id} {unique_id}")  # str(meas_id)
-    print(f"SYNC {meas_id}")
+    logger.info("SYNC %s", meas_id)
     return True
 
 
@@ -167,7 +181,7 @@ def collect_power(next_tx_in: float) -> float:
     time.sleep(next_tx_in + 1.0)
 
     start_time = time.time()
-    print(f"Collecting power measurements for {CAPTURE_POWER_TIME} seconds...")
+    logger.info("Collecting power measurements for %s seconds...", CAPTURE_POWER_TIME)
     try:
         while CAPTURE_POWER_TIME > time.time() - start_time and not stop_requested:
             d = rfep.get_data()
@@ -180,19 +194,21 @@ def collect_power(next_tx_in: float) -> float:
     # take median of the max 10 power samples, median to avoid outliers
     max_samples = sorted(max_samples, reverse=True)[:10]
     if not max_samples:
-        print("No power samples captured.")
+        logger.warning("No power samples captured.")
         return 0.0
     median_power = np.median(max_samples).item()  # np.array to scalar
-    print(
-        f"Power stats: samples={len(max_samples)} "
-        f"max={max_samples[0]} median={median_power}"
+    logger.info(
+        "Power stats: samples=%d max=%s median=%s",
+        len(max_samples),
+        max_samples[0],
+        median_power,
     )
     return median_power
 
 
 def wait_till_tx_done(is_stronger: bool):
     # Wait for all subscribers to send a TX DONE MODE message
-    print(f"Waiting for {num_subscribers} subscribers to send a TX DONE Mode ...")
+    logger.info("Waiting for %d subscribers to send a TX DONE Mode ...", num_subscribers)
 
     # Track number of messages received from subscribers
     messages_received = 0
@@ -234,16 +250,21 @@ def wait_till_tx_done(is_stronger: bool):
                     parts[2],
                     parts[3],
                 )
-                print(
-                    f"{host} phase={applied_phase} delta={applied_delta} starting_in={starting_in} "
-                    f"({messages_received}/{num_subscribers})"
+                logger.info(
+                    "%s phase=%s delta=%s starting_in=%s (%d/%d)",
+                    host,
+                    applied_phase,
+                    applied_delta,
+                    starting_in,
+                    messages_received,
+                    num_subscribers,
                 )
                 if float(starting_in) > max_starting_in:
                     max_starting_in = float(starting_in)
                 tx_updates.append((host, applied_phase, applied_delta))
 
             else:
-                print(f"{message} ({messages_received}/{num_subscribers})")
+                logger.info("%s (%d/%d)", message, messages_received, num_subscribers)
 
             # Send response back to the subscriber
             alive_socket.send_string(str(is_stronger))
@@ -271,7 +292,7 @@ try:
 
         while not stop_requested:
             # Wait for all subscribers to send a message
-            print(f"Waiting for {num_subscribers} subscribers to send a message...")
+            logger.info("Waiting for %d subscribers to send a message...", num_subscribers)
 
             # Start a new measurement entry in the YAML file
             f.write(f"  - meas_id: {meas_id}\n")
@@ -290,15 +311,20 @@ try:
                     is_stronger=stronger
                 )
 
-                time_to_sleep = time.time() - (first_msg_received+next_tx_in)
+                time_to_sleep = (first_msg_received+next_tx_in)- time.time() 
                 current_max_power = collect_power(time_to_sleep)
 
                 stronger = current_max_power > prev_power
 
                 max_power = max(max_power, current_max_power)
 
-                print(
-                    f"Iteration {i}: max_power={max_power} now_power = {current_max_power} prev_power={prev_power} stronger={stronger}"
+                logger.info(
+                    "Iteration %d: max_power=%s now_power=%s prev_power=%s stronger=%s",
+                    i,
+                    max_power,
+                    current_max_power,
+                    prev_power,
+                    stronger,
                 )
 
                 prev_power = current_max_power
@@ -312,6 +338,6 @@ try:
                     f.write(f"            applied_delta: {applied_delta}\n")
 except KeyboardInterrupt:
     stop_requested = True
-    print("KeyboardInterrupt received, shutting down...")
+    logger.info("KeyboardInterrupt received, shutting down...")
 finally:
     cleanup()
