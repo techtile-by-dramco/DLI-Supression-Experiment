@@ -1,5 +1,6 @@
 import logging
 import os
+from random import uniform
 import socket
 import sys
 import threading
@@ -1122,12 +1123,7 @@ def main():
                 prev_delta=prev_delta
             )
 
-            # send first so it doesnt hang on the ZMQ, so it can schedule the capture time
             start_now_cmd = start_next_cmd
-            start_next_cmd += 60.0  # Schedule next command
-            alive_socket.send_string(
-                f"{HOSTNAME} {applied_phase} {applied_delta} {delta(usrp, start_next_cmd):.2f}"
-            )
 
             tx_phase_coh(
                 usrp,
@@ -1143,8 +1139,15 @@ def main():
 
             logger.debug("Sending TX DONE MODE")
 
+            start_next_cmd += 60.0  # Schedule next command
+            time.sleep(uniform(0, 1)) #ensure all RPIs do not send all at once
+            send_str_start = time.time()
+            alive_socket.send_string(
+                f"{HOSTNAME} {applied_phase} {applied_delta} {delta(usrp, start_next_cmd):.2f}"
+            )
+
             rx_stronger = alive_socket.recv_string()
-            logger.debug("Received from server: %s", rx_stronger)
+            logger.debug("Received from server: %s and took %ss", rx_stronger, time.time() - send_str_start)
             stronger = rx_stronger.lower().strip() == "true"
 
         print("DONE ENERGY BALL transmission.")
