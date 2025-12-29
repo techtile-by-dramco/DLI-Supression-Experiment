@@ -1124,7 +1124,7 @@ def main():
 
             # send first so it doesnt hang on the ZMQ, so it can schedule the capture time
             start_now_cmd = start_next_cmd
-            start_next_cmd += CAPTURE_TIME + 2 * margin
+            start_next_cmd += CAPTURE_TIME + 2 * margin + 10
             alive_socket.send_string(
                 f"{HOSTNAME} {applied_phase} {applied_delta} {delta(usrp, start_next_cmd):.2f}"
             )
