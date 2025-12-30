@@ -189,6 +189,8 @@ def send_sync():
 
         # If some messages were received but no new message comes within WAIT_TIMEOUT, break
         if messages_received > 2 and time.time() - new_msg_received > WAIT_TIMEOUT:
+            logger.error("Timeout waiting for subscribers. Proceeding with %d/%d messages received.",
+                         messages_received, num_subscribers)
             break
 
         if alive_socket in _socks and _socks[alive_socket] == zmq.POLLIN:
