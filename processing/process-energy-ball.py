@@ -21,6 +21,11 @@ wavelength = 3e8 / 920e6  # meters
 GRID_RES = 0.1 * wavelength  # meters
 POS_CMAP = "inferno"
 
+
+def wrap_phase(m):
+    """Wrap phases to [-pi, pi]."""
+    return np.angle(np.exp(1j * m))
+
 # Ensure project root on sys.path for pickled objects (e.g., lib.* classes)
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
@@ -153,7 +158,7 @@ def compute_heatmap(xs, ys, vs, grid_res):
     return heatmap, counts, x_edges, y_edges, xi, yi
 
 
-def plot_position_heatmap(folder_label, heatmap, counts, x_edges, y_edges, recent_cells=None):
+def plot_position_heatmap(folder_label, heatmap, counts, x_edges, y_edges, target=None):
     """Render a position/value heatmap in meters."""
     fig, ax = plt.subplots()
     img = ax.imshow(
@@ -167,20 +172,18 @@ def plot_position_heatmap(folder_label, heatmap, counts, x_edges, y_edges, recen
     ax.set_ylabel("y [m]")
     cbar = fig.colorbar(img, ax=ax)
     cbar.ax.set_ylabel("Mean power per cell [uW]")
-    if recent_cells:
-        for idx, (i_x, i_y) in enumerate(recent_cells):
-            if 0 <= i_x < len(x_edges) - 1 and 0 <= i_y < len(y_edges) - 1:
-                edgecolor = "lime" if idx == len(recent_cells) - 1 else "red"
-                ax.add_patch(
-                    plt.Rectangle(
-                        (x_edges[i_x], y_edges[i_y]),
-                        x_edges[i_x + 1] - x_edges[i_x],
-                        y_edges[i_y + 1] - y_edges[i_y],
-                        fill=False,
-                        edgecolor=edgecolor,
-                        linewidth=2,
-                    )
-                )
+    if target:
+        tx, ty, w, h = target
+        ax.add_patch(
+            plt.Rectangle(
+                (tx, ty),
+                w,
+                h,
+                fill=False,
+                edgecolor="lime",
+                linewidth=2,
+            )
+        )
     fig.tight_layout()
 
 
@@ -192,6 +195,19 @@ def main():
         "input",
         nargs="?",
         help="Path to exp-*.yml (defaults to latest in server/record/data)",
+    )
+    parser.add_argument(
+        "--plot",
+        action="store_true",
+        help="Render plots (disabled by default)",
+    )
+    parser.add_argument(
+        "--target",
+        nargs=3,
+        type=float,
+        metavar=("X", "Y", "Z"),
+        default=[3.181, 1.774, 0.266],
+        help="Target xyz to highlight on the position heatmap (z ignored).",
     )
     args = parser.parse_args()
 
@@ -228,130 +244,142 @@ def main():
     powers = np.nanmean(power_matrix, axis=1) if power_matrix.size else []
     max_idx = int(np.nanargmax(powers)) if len(powers) else 0
     max_iter_val = iters[max_idx] if len(iters) else None
-
-    plt.figure(figsize=(8, 4))
-    plt.plot(iters, powers, marker="o")
-    plt.xlabel("Iteration")
-    plt.ylabel("Power (uW)")
-    plt.title(f"Energy-ball max power per iteration\n{os.path.basename(input_path)}")
-    plt.grid(True)
-    plt.tight_layout()
-
-    # Heatmap of power per iteration and host; y-axis labels show power in uW.
-    if power_matrix.size:
-        plt.figure(figsize=(max(4, len(ds["host"]) * 0.5), max(3, len(powers) * 0.25)))
-        im_power = plt.imshow(power_matrix, aspect="auto", cmap="plasma")
-        plt.colorbar(im_power, label="Power (uW)")
-        plt.xticks(range(len(ds["host"])), ds["host"].to_numpy(), rotation=45)
-        plt.yticks(range(len(iters)), [f"iter {it}: {p:.2f} uW" for it, p in zip(iters, powers)])
-        plt.xlabel("Host")
-        plt.title("Power per iteration (heatmap)")
-        plt.tight_layout()
-
-    # Phase heatmaps (raw + normalized), wrapped to [-pi, pi].
-    phase_matrix = ds["applied_phase_rad"].to_numpy()
     host_labels = ds["host"].to_numpy()
-    iter_labels = iters
-    if phase_matrix.size:
-        wrap = lambda m: np.angle(np.exp(1j * m))
-        pm = wrap(phase_matrix)
 
-        plt.figure(figsize=(max(6, len(iter_labels) * 0.4), max(6, len(host_labels) * 0.2)))
-        im_phase = plt.imshow(pm, aspect="auto", cmap="twilight_shifted", interpolation="nearest")
-        plt.colorbar(im_phase, label="Phase (rad)")
-        plt.xticks(range(len(host_labels)), host_labels, rotation=45)
-        plt.yticks(range(len(iter_labels)), iter_labels)
-        plt.xlabel("Host")
-        plt.ylabel("Iteration")
-        plt.title("Applied phases per client")
-        plt.tight_layout()
-
-        # Normalized against first iteration (row 0).
-        norm_iter0 = wrap(phase_matrix - phase_matrix[:1, :])
-        plt.figure(figsize=(max(6, len(iter_labels) * 0.4), max(6, len(host_labels) * 0.2)))
-        im_phase_norm_iter = plt.imshow(norm_iter0, aspect="auto", cmap="twilight_shifted", interpolation="nearest")
-        plt.colorbar(im_phase_norm_iter, label="Phase delta vs iter0 (rad)")
-        plt.xticks(range(len(host_labels)), host_labels, rotation=45)
-        plt.yticks(range(len(iter_labels)), iter_labels)
-        plt.xlabel("Host")
-        plt.ylabel("Iteration")
-        plt.title("Applied phases (normalized to iteration 0)")
-        plt.tight_layout()
-
-        # Normalized against first host (column 0).
-        norm_host0 = wrap(phase_matrix - phase_matrix[:, :1])
-        plt.figure(figsize=(max(6, len(iter_labels) * 0.4), max(6, len(host_labels) * 0.2)))
-        im_phase_norm_host = plt.imshow(norm_host0, aspect="auto", cmap="twilight_shifted", interpolation="nearest")
-        plt.colorbar(im_phase_norm_host, label="Phase delta vs host0 (rad)")
-        plt.xticks(range(len(host_labels)), host_labels, rotation=45)
-        plt.yticks(range(len(iter_labels)), iter_labels)
-        plt.xlabel("Host")
-        plt.ylabel("Iteration")
-        plt.title("Applied phases (normalized to host 0)")
-        plt.tight_layout()
-
-        # Compare first iteration vs max-power iteration (phase rows + delta).
-        if max_iter_val is not None:
-            compare_rows = wrap(np.vstack([phase_matrix[0], phase_matrix[max_idx]]))
-            plt.figure(
-                figsize=(max(6, len(host_labels) * 0.4), 3)
+    # Store best phases (deg) at max-power iteration.
+    if power_matrix.size and len(host_labels) and max_iter_val is not None:
+        phase_matrix = ds["applied_phase_rad"].to_numpy()
+        if max_idx < phase_matrix.shape[0]:
+            phases_deg = np.rad2deg(wrap_phase(phase_matrix[max_idx]))
+            best_phases = {}
+            for host, deg in zip(host_labels, phases_deg):
+                if np.isnan(deg):
+                    continue
+                best_phases[str(host)] = float(deg)
+            out_path = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "client", "tx-phases-energy-ball.yml")
             )
-            im_compare = plt.imshow(compare_rows, aspect="auto", cmap="twilight_shifted", interpolation="nearest")
-            plt.colorbar(im_compare, label="Phase (rad)")
+            with open(out_path, "w") as fh:
+                yaml.safe_dump(best_phases, fh)
+            print(f"Wrote max-power phases (deg) for iter {max_iter_val} to {out_path}")
+
+    do_plot = args.plot
+
+    if do_plot:
+        plt.figure(figsize=(8, 4))
+        plt.plot(iters, powers, marker="o")
+        plt.xlabel("Iteration")
+        plt.ylabel("Power (uW)")
+        plt.title(f"Energy-ball max power per iteration\n{os.path.basename(input_path)}")
+        plt.grid(True)
+        plt.tight_layout()
+
+        # Heatmap of power per iteration and host; y-axis labels show power in uW.
+        if power_matrix.size:
+            plt.figure(figsize=(max(4, len(ds["host"]) * 0.5), max(3, len(powers) * 0.25)))
+            im_power = plt.imshow(power_matrix, aspect="auto", cmap="plasma")
+            plt.colorbar(im_power, label="Power (uW)")
+            plt.xticks(range(len(ds["host"])), ds["host"].to_numpy(), rotation=45)
+            plt.yticks(range(len(iters)), [f"iter {it}: {p:.2f} uW" for it, p in zip(iters, powers)])
+            plt.xlabel("Host")
+            plt.title("Power per iteration (heatmap)")
+            plt.tight_layout()
+
+        # Phase heatmaps (raw + normalized), wrapped to [-pi, pi].
+        phase_matrix = ds["applied_phase_rad"].to_numpy()
+        host_labels = ds["host"].to_numpy()
+        iter_labels = iters
+        if phase_matrix.size:
+            wrap = lambda m: np.angle(np.exp(1j * m))
+            pm = wrap(phase_matrix)
+
+            plt.figure(figsize=(max(6, len(iter_labels) * 0.4), max(6, len(host_labels) * 0.2)))
+            im_phase = plt.imshow(pm, aspect="auto", cmap="twilight_shifted", interpolation="nearest")
+            plt.colorbar(im_phase, label="Phase (rad)")
             plt.xticks(range(len(host_labels)), host_labels, rotation=45)
-            plt.yticks([0, 1], [f"iter {iter_labels[0]}", f"iter {max_iter_val} (max power)"])
+            plt.yticks(range(len(iter_labels)), iter_labels)
             plt.xlabel("Host")
             plt.ylabel("Iteration")
-            plt.title("Applied phases: iter0 vs max-power iteration")
+            plt.title("Applied phases per client")
             plt.tight_layout()
 
-            delta_rows = wrap(phase_matrix[max_idx:max_idx+1, :] - phase_matrix[:1, :])
-            plt.figure(
-                figsize=(max(6, len(host_labels) * 0.4), 3)
-            )
-            plt.scatter(range(len(host_labels)), np.rad2deg(delta_rows[0]), c="blue", s=50)
+            # Normalized against first iteration (row 0).
+            norm_iter0 = wrap(phase_matrix - phase_matrix[:1, :])
+            plt.figure(figsize=(max(6, len(iter_labels) * 0.4), max(6, len(host_labels) * 0.2)))
+            im_phase_norm_iter = plt.imshow(norm_iter0, aspect="auto", cmap="twilight_shifted", interpolation="nearest")
+            plt.colorbar(im_phase_norm_iter, label="Phase delta vs iter0 (rad)")
             plt.xticks(range(len(host_labels)), host_labels, rotation=45)
+            plt.yticks(range(len(iter_labels)), iter_labels)
             plt.xlabel("Host")
-            plt.ylabel("Delta row (deg)")
-            plt.title("Phase delta: max-power iteration vs iter0")
+            plt.ylabel("Iteration")
+            plt.title("Applied phases (normalized to iteration 0)")
             plt.tight_layout()
 
-    # Position/value heatmap for the folder containing the input file.
-    folder_for_positions = os.path.abspath(os.path.dirname(input_path))
-    try:
-        positions, values = load_position_value_pairs(folder_for_positions)
-    except Exception as exc:
-        print(f"Skipping position heatmap due to error: {exc}", file=sys.stderr)
-        positions = values = None
+            # Normalized against first host (column 0).
+            norm_host0 = wrap(phase_matrix - phase_matrix[:, :1])
+            plt.figure(figsize=(max(6, len(iter_labels) * 0.4), max(6, len(host_labels) * 0.2)))
+            im_phase_norm_host = plt.imshow(norm_host0, aspect="auto", cmap="twilight_shifted", interpolation="nearest")
+            plt.colorbar(im_phase_norm_host, label="Phase delta vs host0 (rad)")
+            plt.xticks(range(len(host_labels)), host_labels, rotation=45)
+            plt.yticks(range(len(iter_labels)), iter_labels)
+            plt.xlabel("Host")
+            plt.ylabel("Iteration")
+            plt.title("Applied phases (normalized to host 0)")
+            plt.tight_layout()
 
-    if positions is not None and values is not None:
-        xs = np.array([p.x for p in positions], dtype=float)
-        ys = np.array([p.y for p in positions], dtype=float)
-        vs = np.array([v.pwr_pw / 1e6 for v in values], dtype=float)  # uW
+            # Compare first iteration vs max-power iteration (phase rows + delta).
+            if max_iter_val is not None:
+                compare_rows = wrap(np.vstack([phase_matrix[0], phase_matrix[max_idx]]))
+                plt.figure(
+                    figsize=(max(6, len(host_labels) * 0.4), 3)
+                )
+                im_compare = plt.imshow(compare_rows, aspect="auto", cmap="twilight_shifted", interpolation="nearest")
+                plt.colorbar(im_compare, label="Phase (rad)")
+                plt.xticks(range(len(host_labels)), host_labels, rotation=45)
+                plt.yticks([0, 1], [f"iter {iter_labels[0]}", f"iter {max_iter_val} (max power)"])
+                plt.xlabel("Host")
+                plt.ylabel("Iteration")
+                plt.title("Applied phases: iter0 vs max-power iteration")
+                plt.tight_layout()
 
-        heatmap, counts, x_edges, y_edges, xi, yi = compute_heatmap(xs, ys, vs, GRID_RES)
-        print(
-            f"Position heatmap for {folder_for_positions}: {len(xs)} samples, grid {heatmap.shape[0]}x{heatmap.shape[1]}"
-        )
+                delta_rows = wrap(phase_matrix[max_idx:max_idx+1, :] - phase_matrix[:1, :])
+                plt.figure(
+                    figsize=(max(6, len(host_labels) * 0.4), 3)
+                )
+                plt.scatter(range(len(host_labels)), np.rad2deg(delta_rows[0]), c="blue", s=50)
+                plt.xticks(range(len(host_labels)), host_labels, rotation=45)
+                plt.xlabel("Host")
+                plt.ylabel("Delta row (deg)")
+                plt.title("Phase delta: max-power iteration vs iter0")
+                plt.tight_layout()
 
-        recent_cells = []
-        seen = set()
-        for cell in reversed(list(zip(xi, yi))):
-            if cell in seen:
-                continue
-            seen.add(cell)
-            recent_cells.append(cell)
-            if len(recent_cells) == 5:
-                break
-        recent_cells.reverse()
+        # Position/value heatmap for the folder containing the input file.
+        folder_for_positions = os.path.abspath(os.path.dirname(input_path))
+        try:
+            positions, values = load_position_value_pairs(folder_for_positions)
+        except Exception as exc:
+            print(f"Skipping position heatmap due to error: {exc}", file=sys.stderr)
+            positions = values = None
 
-        plot_position_heatmap(
-            os.path.basename(folder_for_positions), heatmap, counts, x_edges, y_edges, recent_cells
-        )
-    else:
-        print(f"No *_positions.npy/_values.npy pairs found in {folder_for_positions}", file=sys.stderr)
+        if positions is not None and values is not None:
+            xs = np.array([p.x for p in positions], dtype=float)
+            ys = np.array([p.y for p in positions], dtype=float)
+            vs = np.array([v.pwr_pw / 1e6 for v in values], dtype=float)  # uW
 
-    plt.show()
+            heatmap, counts, x_edges, y_edges, xi, yi = compute_heatmap(xs, ys, vs, GRID_RES)
+            print(
+                f"Position heatmap for {folder_for_positions}: {len(xs)} samples, grid {heatmap.shape[0]}x{heatmap.shape[1]}"
+            )
+
+            tx, ty = args.target[0], args.target[1]
+            target_rect = (tx - GRID_RES / 2, ty - GRID_RES / 2, GRID_RES, GRID_RES)
+            plot_position_heatmap(
+                os.path.basename(folder_for_positions), heatmap, counts, x_edges, y_edges, target_rect
+            )
+        else:
+            print(f"No *_positions.npy/_values.npy pairs found in {folder_for_positions}", file=sys.stderr)
+
+        plt.show()
 
 
 if __name__ == "__main__":

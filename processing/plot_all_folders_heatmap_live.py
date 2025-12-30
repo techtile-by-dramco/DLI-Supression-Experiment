@@ -105,7 +105,7 @@ def create_figure(folder_name: str, x_centers, y_centers, z, x_edges, y_edges, t
             y0=y_edges[iy],
             y1=y_edges[iy + 1],
             line=dict(color="cyan", width=3),
-            fillcolor="rgba(0,0,0,0)",
+            fillcolor="rgba(0,255,255,0.25)",
         )
     return fig
 
