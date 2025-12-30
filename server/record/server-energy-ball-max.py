@@ -17,6 +17,27 @@ from datetime import datetime, UTC, timezone
 # from helper import *
 import numpy as np
 
+def _fmt_power(pw: float) -> str:
+    """Format power in pW with scaling to nW/uW/mW."""
+    if pw is None:
+        return "n/a"
+    try:
+        val = float(pw)
+    except (TypeError, ValueError):
+        return str(pw)
+    unit = "pW"
+    abs_pw = abs(val)
+    if abs_pw >= 1e9:
+        unit = "mW"
+        val = val / 1e9
+    elif abs_pw >= 1e6:
+        unit = "uW"
+        val = val / 1e6
+    elif abs_pw >= 1e3:
+        unit = "nW"
+        val = val / 1e3
+    return f"{val:12.3f} {unit}"
+
 # =============================================================================
 #                           Experiment Configuration
 # =============================================================================
@@ -93,6 +114,8 @@ poller.register(
 # Maximum time to wait for messages before breaking out of the inner loop (10 minutes)
 WAIT_TIMEOUT = 10.0
 
+TIME_DIFF_MSG = 1.0  # warn if gap between received messages exceeds this (s)
+
 # Inform the user that the experiment is starting
 logger.info("Starting experiment: %s", unique_id)
 
@@ -114,7 +137,7 @@ rfep = RFEP(settings["ep"]["ip"], settings["ep"]["port"])
 
 logger.info("Initial RFEP data: %s", rfep.get_data())
 
-CAPTURE_POWER_TIME = 2.0
+CAPTURE_POWER_TIME = 3.0
 prev_power = 0
 stop_requested = False
 
@@ -181,7 +204,7 @@ def send_sync():
             alive_socket.send_string(response)
 
     # Wait a fixed delay before sending the next SYNC signal
-    logger.info("sending 'SYNC' message in %ss...", delay)
+    logger.info("sending 'SYNC' message in %.2f ms...", delay * 1000.0)
     f.flush()
     time.sleep(delay)
 
@@ -197,11 +220,11 @@ def send_sync():
 def collect_power(next_tx_in: float) -> float:
     max_samples = []
 
-    # sleep till TX+0.5s
-    time.sleep(next_tx_in + 0.5)
+
+    time.sleep(next_tx_in) # no need for margin as we take the max power anyhow.
 
     start_time = time.time()
-    logger.info("Collecting power measurements for %s seconds...", CAPTURE_POWER_TIME)
+    logger.info("Collecting power measurements for %s seconds...", CAPTURE_POWER_TIME/100.0)
     try:
         while CAPTURE_POWER_TIME > time.time() - start_time and not stop_requested:
             d = rfep.get_data()
@@ -234,6 +257,7 @@ def wait_till_tx_done(is_stronger: bool, best_phase_per_host: dict[str, float]):
     messages_received = 0
     first_msg_received = 0.0
     new_msg_received = 0
+    last_msg_time = None
 
     max_starting_in = 0.0
     tx_updates = []
@@ -244,7 +268,7 @@ def wait_till_tx_done(is_stronger: bool, best_phase_per_host: dict[str, float]):
             socks = dict(poller.poll(1000))
         except KeyboardInterrupt:
             _handle_interrupt()
-            return max_starting_in, tx_updates
+            return max_starting_in, tx_updates, first_msg_received, messages_received
 
         # If some messages were received but no new message comes within WAIT_TIMEOUT, break
         if messages_received > 2 and time.time() - new_msg_received > WAIT_TIMEOUT:
@@ -253,6 +277,7 @@ def wait_till_tx_done(is_stronger: bool, best_phase_per_host: dict[str, float]):
         if alive_socket in socks and socks[alive_socket] == zmq.POLLIN:
             # Record time when a new message is received
             new_msg_received = time.time()
+            last_msg_time = new_msg_received
 
             if messages_received == 0:
                 first_msg_received = time.time()
@@ -270,14 +295,16 @@ def wait_till_tx_done(is_stronger: bool, best_phase_per_host: dict[str, float]):
                     parts[2],
                     parts[3],
                 )
+                if messages_received == 1:
+                    logger.info("idx   host           phase(rad)    delta(rad)    start(s)")
                 logger.info(
-                    "%s phase=%s delta=%s starting_in=%s (%d/%d)",
-                    host,
-                    applied_phase,
-                    applied_delta,
-                    starting_in,
+                    "%3d/%-3d %-12s %12.6f %12.6f %10.2f",
                     messages_received,
                     num_subscribers,
+                    host,
+                    float(applied_phase),
+                    float(applied_delta),
+                    float(starting_in),
                 )
                 if float(starting_in) > max_starting_in:
                     max_starting_in = float(starting_in)
@@ -289,7 +316,13 @@ def wait_till_tx_done(is_stronger: bool, best_phase_per_host: dict[str, float]):
             # Send response back to the subscriber
             best_phase = best_phase_per_host.get(host, applied_phase)
             alive_socket.send_string(f"{is_stronger} {best_phase}")
-    return max_starting_in, tx_updates, first_msg_received
+    if last_msg_time and first_msg_received and (last_msg_time - first_msg_received) > TIME_DIFF_MSG:
+        logger.warning(
+            "Time difference first->last message exceeded: %.2fs (threshold %.2fs)",
+            last_msg_time - first_msg_received,
+            TIME_DIFF_MSG,
+        )
+    return max_starting_in, tx_updates, first_msg_received, messages_received
 
 def cleanup():
     try:
@@ -329,7 +362,7 @@ try:
             f.write("    iterations:\n")
 
             for i in range(0, 100):
-                next_tx_in, tx_updates, first_msg_received = wait_till_tx_done(
+                next_tx_in, tx_updates, first_msg_received, messages_received = wait_till_tx_done(
                     is_stronger=stronger,
                     best_phase_per_host=best_phase_per_host,
                 )
@@ -342,12 +375,20 @@ try:
                 max_power = max(max_power, current_max_power)
 
                 logger.info(
-                    "Iteration %d: max_power=%s now_power=%s prev_power=%s stronger=%s",
+                    "\n"
+                    "=============================================\n"
+                    "Iteration    : %3d\n"
+                    "Subscribers  : %3d / %3d\n"
+                    "Max power    : %s\n"
+                    "Current power: %s\n"
+                    "Status       : %s\n"
+                    "=============================================",
                     i,
-                    max_power,
-                    current_max_power,
-                    prev_power,
-                    stronger,
+                    messages_received,
+                    num_subscribers,
+                    _fmt_power(max_power),
+                    _fmt_power(current_max_power),
+                    "STRONGER" if stronger else "WEAKER",
                 )
 
                 if current_max_power >= max_power: # equals as well as if the current > max, than max = current

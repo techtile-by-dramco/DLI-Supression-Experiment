@@ -943,6 +943,28 @@ def get_random_phase() -> float:
     return float(np.random.uniform(-np.pi, np.pi))
 
 
+def log_configuration():
+    """Log key configuration values in a readable block."""
+    cfg = {
+        "host": HOSTNAME,
+        "server_ip": SERVER_IP,
+        "cmd_delay": CMD_DELAY,
+        "rx_tx_same_channel": RX_TX_SAME_CHANNEL,
+        "clock_timeout_ms": CLOCK_TIMEOUT,
+        "init_delay_s": INIT_DELAY,
+        "rate_sps": RATE,
+        "loopback_tx_gain": LOOPBACK_TX_GAIN,
+        "rx_gain": RX_GAIN,
+        "capture_time_s": CAPTURE_TIME,
+        "freq_hz": FREQ,
+        "next_phase_alg": NEXT_PHASE_ALG,
+    }
+    lines = ["Configuration:"]
+    for k in sorted(cfg):
+        lines.append(f"  {k}: {cfg[k]}")
+    logger.info("\n".join(lines))
+
+
 def get_next_phase_energyball(
     current_phase: float,
     stronger: bool,
@@ -1051,8 +1073,11 @@ def main():
         logger.error(f"Error parsing 'cal-settings.yml': {e}")
         exit()
     except Exception as e:
-        logger.error(f"Unexpected error while loading calibration settings: {e}")
+            logger.error(f"Unexpected error while loading calibration settings: {e}")
         exit()
+
+    # Log configuration after all overrides
+    log_configuration()
 
     try:
         # Get current path
@@ -1220,7 +1245,7 @@ def main():
 
             logger.debug("Sending TX DONE MODE")
 
-            start_next_cmd += 30.0  # Schedule next command
+            start_next_cmd += 15.0  # Schedule next command
             time.sleep(uniform(0, 1)) #ensure all RPIs do not send all at once
             send_str_start = time.time()
             alive_socket.send_string(
