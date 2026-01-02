@@ -201,6 +201,8 @@ def save_all_figs(save_dir: str, prefix: str):
         if title:
             title_clean = re.sub(r"\s+", "_", title.strip())
             title_clean = title_clean.replace(os.sep, "_")
+            # Remove characters that are invalid on Windows filesystems
+            title_clean = re.sub(r'[<>:"/\\\\|?*]+', "_", title_clean)
             fname = f"{prefix}-{idx}-{title_clean}.png"
         else:
             fname = f"{prefix}-{idx}.png"
