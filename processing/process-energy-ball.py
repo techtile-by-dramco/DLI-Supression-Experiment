@@ -9,12 +9,13 @@ the max power per iteration. Outputs tables/plots and builds an xarray Dataset.
 import argparse
 import glob
 import os
+import re
 import sys
 from typing import Iterable, Tuple
 
-import xarray as xr
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
 import yaml
 
 wavelength = 3e8 / 920e6  # meters
@@ -187,6 +188,27 @@ def plot_position_heatmap(folder_label, heatmap, counts, x_edges, y_edges, targe
     fig.tight_layout()
 
 
+def save_all_figs(save_dir: str, prefix: str):
+    """Persist all open matplotlib figures as numbered PNGs with title in filename."""
+    os.makedirs(save_dir, exist_ok=True)
+    for idx, num in enumerate(plt.get_fignums(), start=1):
+        fig = plt.figure(num)
+        title = None
+        if fig._suptitle is not None:  # type: ignore[attr-defined]
+            title = fig._suptitle.get_text()
+        elif fig.axes:
+            title = fig.axes[0].get_title()
+        if title:
+            title_clean = re.sub(r"\s+", "_", title.strip())
+            title_clean = title_clean.replace(os.sep, "_")
+            fname = f"{prefix}-{idx}-{title_clean}.png"
+        else:
+            fname = f"{prefix}-{idx}.png"
+        out_path = os.path.join(save_dir, fname)
+        fig.savefig(out_path, dpi=200, bbox_inches="tight")
+        print(f"Saved plot to {out_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Process energy-ball YAML and list max power per iteration."
@@ -200,6 +222,10 @@ def main():
         "--plot",
         action="store_true",
         help="Render plots (disabled by default)",
+    )
+    parser.add_argument(
+        "--save-dir",
+        help="Directory to save generated plots as PNGs (defaults to folder containing the input YAML)",
     )
     parser.add_argument(
         "--target",
@@ -378,6 +404,17 @@ def main():
             )
         else:
             print(f"No *_positions.npy/_values.npy pairs found in {folder_for_positions}", file=sys.stderr)
+
+        # Save plots to disk before showing them.
+        save_dir = args.save_dir or os.path.abspath(os.path.dirname(input_path))
+        if plt.get_fignums():
+            save_all_figs(save_dir, os.path.splitext(os.path.basename(input_path))[0])
+
+       
+        # If plotting is disabled but save-dir is provided, still write any figures created elsewhere.
+        if plt.get_fignums():
+            save_dir = args.save_dir or os.path.abspath(os.path.dirname(input_path))
+            save_all_figs(save_dir, os.path.splitext(os.path.basename(input_path))[0])
 
         plt.show()
 
