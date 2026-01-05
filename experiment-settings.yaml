@@ -48,7 +48,7 @@ test_connectivity: False             # set True if you want to test tile connect
 halt_on_connectivity_failure: False  # set False if you want to continue with only the active tiles
 
 experiment_config:
-  target_location: 3.214765380859375, 1.77064404296875, 0.265255615234375
+  target_location: 3.278115966796875, 1.778475341796875, 0.2522267761230469
 
 # Energy Profiler settings
 ep:
