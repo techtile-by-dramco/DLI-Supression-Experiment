@@ -11,6 +11,7 @@ import numpy as np
 import tensorflow as tf
 import requests
 import yaml
+from typing import Iterable
 
 import sionna.rt as rt
 from sionna.rt import load_scene
@@ -19,17 +20,15 @@ from sionna.rt import load_scene
 # CONFIG
 # ============================================================
 # Receiver location (single antenna RX)
-target_location = np.array(
-    [3.214765380859375, 1.77064404296875, 0.265255615234375], dtype=np.float32
-) # center of grid
+# target_location = np.array([3.278115966796875, 1.778475341796875, 0.2522267761230469], dtype=np.float32)  # center of grid
 # target_location = np.array([3.181, 1.774, 0.266], dtype=np.float32) #jarne location
 # target_location = np.array(
 #     [3.201299560546875, 1.70512451171875, 0.23005308532714844], dtype=np.float32
 # )
 # Specular multipath control
 
-specular_order = 1 # 0=LOS only, 1=first order, 2=second order, ...
-SDR = True  # enable specular/diffuse/refraction
+SPEC_ORDERS = [0,1,2,1,2]
+SDRs = [False, False, False, True, True] 
 
 positions_url = (
     "https://raw.githubusercontent.com/techtile-by-dramco/"
@@ -45,6 +44,60 @@ fc = 920e6  # Hz
 # XML scene path
 script_dir = Path(__file__).resolve().parent
 xml_path = script_dir / "room.xml"
+experiment_settings_path = script_dir.parent / "experiment-settings.yaml"
+
+
+def load_target_location(settings_path: Path) -> np.ndarray:
+    """Load target_location from experiment-settings.yaml and return it as np.array."""
+    if not settings_path.exists():
+        raise FileNotFoundError(f"Experiment settings file not found at {settings_path}")
+
+    with open(settings_path, "r", encoding="utf-8") as f:
+        settings = yaml.safe_load(f)
+
+    try:
+        raw_value = settings["experiment_config"]["target_location"]
+    except Exception as e:
+        raise ValueError("target_location not found in experiment-settings.yaml") from e
+
+    if isinstance(raw_value, str):
+        parts = [p.strip() for p in raw_value.split(",") if p.strip()]
+    elif isinstance(raw_value, Iterable):
+        parts = list(raw_value)
+    else:
+        raise ValueError("target_location must be a string or iterable of three coordinates")
+
+    if len(parts) != 3:
+        raise ValueError("target_location must contain exactly three coordinates (x, y, z)")
+
+    try:
+        coords = [float(val) for val in parts]
+    except (TypeError, ValueError) as e:
+        raise ValueError("target_location coordinates must be numeric") from e
+
+    return np.array(coords, dtype=np.float32)
+
+
+target_location = load_target_location(experiment_settings_path)
+print(f"Using target_location from {experiment_settings_path}: {target_location.tolist()}")
+
+
+def configure_strategy() -> tf.distribute.Strategy:
+    """Configure TensorFlow to use all visible GPUs with MirroredStrategy when available."""
+    gpus = tf.config.list_physical_devices("GPU")
+    if gpus:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        if len(gpus) > 1:
+            print(f"Using MirroredStrategy across {len(gpus)} GPUs.")
+            return tf.distribute.MirroredStrategy()
+        print("Single GPU detected; using default strategy.")
+    else:
+        print("No GPU detected; using default strategy (CPU).")
+    return tf.distribute.get_strategy()
+
+
+strategy = configure_strategy()
 
 # ============================================================
 # LOAD TX POSITIONS (channel 1 only) -> all_pts
@@ -135,223 +188,227 @@ room_xml = f"""<?xml version="1.0"?>
 xml_path.write_text(room_xml, encoding="utf-8")
 print(f"Wrote room XML to {xml_path}")
 
-# ============================================================
-# LOAD SCENE
-# ============================================================
+with strategy.scope():
+    solver = rt.PathSolver()
 
-if specular_order == 0:
-    scene = load_scene(None)
-else:
-    scene = load_scene(str(xml_path))
-#
+    for specular_order, SDR in zip(SPEC_ORDERS, SDRs):
+        print(f"\n=== Specular order: {specular_order}, SDR: {SDR} ===")
 
-# ============================================================
-# REQUIRED by Sionna RT (even for "single antennas"):
-# set 1x1 arrays to define element pattern / polarization
-# ============================================================
+        # ============================================================
+        # LOAD SCENE
+        # ============================================================
 
-scene.tx_array = rt.PlanarArray(
-    num_rows=1,
-    num_cols=1,
-    vertical_spacing=0.0,
-    horizontal_spacing=0.0,
-    pattern="dipole",
-    polarization="V",
-)
+        if specular_order == 0:
+            scene = load_scene(None)
+        else:
+            scene = load_scene(str(xml_path))
+        #
 
-scene.rx_array = rt.PlanarArray(
-    num_rows=1,
-    num_cols=1,
-    vertical_spacing=0.0,
-    horizontal_spacing=0.0,
-    pattern="dipole",
-    polarization="V",
-)
+        # ============================================================
+        # REQUIRED by Sionna RT (even for "single antennas"):
+        # set 1x1 arrays to define element pattern / polarization
+        # ============================================================
 
-# ============================================================
-# RX: single antenna receiver at target_location
-# ============================================================
+        scene.tx_array = rt.PlanarArray(
+            num_rows=1,
+            num_cols=1,
+            vertical_spacing=0.0,
+            horizontal_spacing=0.0,
+            pattern="dipole",
+            polarization="V",
+        )
 
-rx = rt.Receiver(name="rx", position=target_location.tolist())
-scene.add(rx)
+        scene.rx_array = rt.PlanarArray(
+            num_rows=1,
+            num_cols=1,
+            vertical_spacing=0.0,
+            horizontal_spacing=0.0,
+            pattern="dipole",
+            polarization="V",
+        )
 
-# ============================================================
-# TX: irregular array -> one Transmitter per TX element position (all_pts)
-# ============================================================
+        # ============================================================
+        # RX: single antenna receiver at target_location
+        # ============================================================
 
-for name, pos in zip(tx_names, all_pts):
-    scene.add(rt.Transmitter(name=name, position=pos.tolist()))
-    scene.get(name).look_at(rx)
+        rx = rt.Receiver(name="rx", position=target_location.tolist())
+        scene.add(rx)
 
-# ============================================================
-# VISUALIZE SCENE ONLY
-# ============================================================
+        # ============================================================
+        # TX: irregular array -> one Transmitter per TX element position (all_pts)
+        # ============================================================
 
-scene.preview()  # interactive 3D viewer
+        for name, pos in zip(tx_names, all_pts):
+            scene.add(rt.Transmitter(name=name, position=pos.tolist()))
+            scene.get(name).look_at(rx)
 
-# %%
-# ============================================================
-# RAY TRACING (PathSolver API)
-# ============================================================
-# %%
-solver = rt.PathSolver()
-paths = solver(
-    scene=scene,
-    max_depth=specular_order,
-    los=True,
-    specular_reflection=SDR,
-    diffuse_reflection=SDR,
-    refraction=SDR,
-    synthetic_array=False,
-    seed=1,
-)
+        # ============================================================
+        # VISUALIZE SCENE ONLY
+        # ============================================================
 
-# %%
-scene.preview(paths=paths, show_devices=True)  # interactive 3D viewer
+        # scene.preview()  # interactive 3D viewer
 
-# # ============================================================
-# # NARROWBAND CSI PER TX ELEMENT
-# # ============================================================
+        # %%
+        # ============================================================
+        # RAY TRACING (PathSolver API)
+        # ============================================================
+        # %%
 
-# %%
-a, tau = paths.cir(normalize_delays=False, out_type="numpy")
+        paths = solver(
+            scene=scene,
+            max_depth=specular_order,
+            los=True,
+            specular_reflection=SDR,
+            diffuse_reflection=SDR,
+            refraction=SDR,
+            synthetic_array=False,
+            seed=1,
+        )
 
-# Shape: [num_rx, num_rx_ant, num_tx, num_tx_ant, num_paths, num_time_steps]
-print("Shape of a: ", a.shape)
+        # %%
+        # scene.preview(paths=paths, show_devices=True)  # interactive 3D viewer
 
-# Shape: [num_rx, num_rx_ant, num_tx, num_tx_ant, num_paths]
-print("Shape of tau: ", tau.shape)
+        # # ============================================================
+        # # NARROWBAND CSI PER TX ELEMENT
+        # # ============================================================
 
-# %%
-a_abs = np.abs(a)[0, 0, 0, 0, :, 0]
-t = tau[0, 0, 0, 0, :] / 1e-9  # Scale to ns
+        # %%
+        a, tau = paths.cir(normalize_delays=False, out_type="numpy")
 
-import matplotlib.pyplot as plt
+        # Shape: [num_rx, num_rx_ant, num_tx, num_tx_ant, num_paths, num_time_steps]
+        print("Shape of a: ", a.shape)
 
-# And plot the CIR
-plt.figure()
-plt.title("Channel impulse response")
-plt.stem(t, a_abs)
-plt.xlabel(r"$\tau$ [ns]")
-plt.ylabel(r"$|a|$")
+        # Shape: [num_rx, num_rx_ant, num_tx, num_tx_ant, num_paths]
+        print("Shape of tau: ", tau.shape)
 
+        # %%
+        a_abs = np.abs(a)[0, 0, 0, 0, :, 0]
+        t = tau[0, 0, 0, 0, :] / 1e-9  # Scale to ns
 
-# a = paths.a
-# tau = paths.tau
+        import matplotlib.pyplot as plt
 
-# rot = tf.exp(-1j * 2.0 * np.pi * fc * tf.cast(tau, tf.complex64))
-# h_paths = a * rot
-# H_all = tf.reduce_sum(h_paths, axis=-1)  # sum over paths (assumed last axis)
-# H_all = tf.squeeze(H_all)
+        # And plot the CIR
+        plt.figure()
+        plt.title("Channel impulse response")
+        plt.stem(t, a_abs)
+        plt.xlabel(r"$\tau$ [ns]")
+        plt.ylabel(r"$|a|$")
 
+        # a = paths.a
+        # tau = paths.tau
 
-# def extract_per_tx_vector(H, num_tx):
-#     H = tf.convert_to_tensor(H)
-#     shp = H.shape.as_list()
+        # rot = tf.exp(-1j * 2.0 * np.pi * fc * tf.cast(tau, tf.complex64))
+        # h_paths = a * rot
+        # H_all = tf.reduce_sum(h_paths, axis=-1)  # sum over paths (assumed last axis)
+        # H_all = tf.squeeze(H_all)
 
-#     if len(shp) == 1 and shp[0] == num_tx:
-#         return H
+        # def extract_per_tx_vector(H, num_tx):
+        #     H = tf.convert_to_tensor(H)
+        #     shp = H.shape.as_list()
 
-#     for ax, s in enumerate(shp):
-#         if s == num_tx:
-#             x = H
-#             # single RX assumed: index any remaining non-singleton dims at 0
-#             for other_ax in reversed(range(len(shp))):
-#                 if (
-#                     other_ax != ax
-#                     and x.shape[other_ax] is not None
-#                     and x.shape[other_ax] > 1
-#                 ):
-#                     x = tf.gather(x, 0, axis=other_ax)
-#             x = tf.squeeze(x)
+        #     if len(shp) == 1 and shp[0] == num_tx:
+        #         return H
 
-#             if x.shape.rank == 1 and x.shape[0] == num_tx:
-#                 return x
+        #     for ax, s in enumerate(shp):
+        #         if s == num_tx:
+        #             x = H
+        #             # single RX assumed: index any remaining non-singleton dims at 0
+        #             for other_ax in reversed(range(len(shp))):
+        #                 if (
+        #                     other_ax != ax
+        #                     and x.shape[other_ax] is not None
+        #                     and x.shape[other_ax] > 1
+        #                 ):
+        #                     x = tf.gather(x, 0, axis=other_ax)
+        #             x = tf.squeeze(x)
 
-#             x = tf.experimental.numpy.moveaxis(x, ax, 0)
-#             x = tf.reshape(x, [num_tx, -1])
-#             return x[:, 0]
+        #             if x.shape.rank == 1 and x.shape[0] == num_tx:
+        #                 return x
 
-#     raise RuntimeError(f"TX axis of length {num_tx} not found in shape {shp}")
+        #             x = tf.experimental.numpy.moveaxis(x, ax, 0)
+        #             x = tf.reshape(x, [num_tx, -1])
+        #             return x[:, 0]
 
+        #     raise RuntimeError(f"TX axis of length {num_tx} not found in shape {shp}")
 
-# H_tx = extract_per_tx_vector(H_all, num_tx)
+        # H_tx = extract_per_tx_vector(H_all, num_tx)
 
-# csi_mag = tf.abs(H_tx).numpy()
-# csi_phase_rad = tf.math.angle(H_tx).numpy()
-# csi_phase_deg = np.rad2deg(csi_phase_rad)
+        # csi_mag = tf.abs(H_tx).numpy()
+        # csi_phase_rad = tf.math.angle(H_tx).numpy()
+        # csi_phase_deg = np.rad2deg(csi_phase_rad)
 
-# print("H_tx shape:", H_tx.shape)
-# print("Per-TX CSI magnitude:", csi_mag)
-# print("Per-TX CSI phase [deg]:", csi_phase_deg)
-# print("Per-TX CSI phase unwrapped [deg]:", np.rad2deg(np.unwrap(csi_phase_rad)))
+        # print("H_tx shape:", H_tx.shape)
+        # print("Per-TX CSI magnitude:", csi_mag)
+        # print("Per-TX CSI phase [deg]:", csi_phase_deg)
+        # print("Per-TX CSI phase unwrapped [deg]:", np.rad2deg(np.unwrap(csi_phase_rad)))
 
-# %%
-# ------------------------------------------------------------
-# Convert delays to narrowband frequency response at fc:
-#   H(fc) = sum_l a_l * exp(-j 2*pi*fc*tau_l)
-#
-# Use time step 0 (index 0). If you have mobility/time evolution,
-# loop over the last axis of a instead.
-# ------------------------------------------------------------
-# Select RX=0, RXant=0, TXant=0, time_step=0
+        # %%
+        # ------------------------------------------------------------
+        # Convert delays to narrowband frequency response at fc:
+        #   H(fc) = sum_l a_l * exp(-j 2*pi*fc*tau_l)
+        #
+        # Use time step 0 (index 0). If you have mobility/time evolution,
+        # loop over the last axis of a instead.
+        # ------------------------------------------------------------
+        # Select RX=0, RXant=0, TXant=0, time_step=0
 
+        # Shape: [num_rx, num_rx_ant, num_tx, num_tx_ant, num_paths, num_time_steps]
+        print("Shape of a: ", a.shape)
 
-# Shape: [num_rx, num_rx_ant, num_tx, num_tx_ant, num_paths, num_time_steps]
-print("Shape of a: ", a.shape)
+        # Shape: [num_rx, num_rx_ant, num_tx, num_tx_ant, num_paths]
+        print("Shape of tau: ", tau.shape)
 
-# Shape: [num_rx, num_rx_ant, num_tx, num_tx_ant, num_paths]
-print("Shape of tau: ", tau.shape)
+        t = tau[0, 0, :, 0, :]
+        ampl = np.abs(a)[0,0,:,0,:,0]
 
-t = tau[0, 0, :, 0, :]
-ampl = np.abs(a)[0,0,:,0,:,0]
+        h = ampl*np.exp(-1j * 2.0 * np.pi * fc * t)  # [num_tx, num_paths]
+        w = np.sum(h, axis=-1)
+        w_phase_deg = np.rad2deg(-np.angle(w))  # degrees
 
-h = ampl*np.exp(-1j * 2.0 * np.pi * fc * t)  # [num_tx, num_paths]
-w = np.sum(h, axis=-1)
-w_phase_deg = np.rad2deg(-np.angle(w))  # degrees
+        # %%
+        # ------------------------------------------------------------
+        # Export to YAML in the same structure as your Friis script
+        # tile -> [{ch:0, ampl:0, phase:0}, {ch:1, ampl:AMPLITUDE, phase:<deg>}]
+        # ------------------------------------------------------------
+        out_full_dict = {}
+        out_dict = {}
 
-# %%
-# ------------------------------------------------------------
-# Export to YAML in the same structure as your Friis script
-# tile -> [{ch:0, ampl:0, phase:0}, {ch:1, ampl:AMPLITUDE, phase:<deg>}]
-# ------------------------------------------------------------
-out_full_dict = {}
-out_dict = {}
+        # IMPORTANT: This assumes the TX ordering in paths.cir() matches the ordering
+        # you added Transmitters / the ordering in config["antennes"] (channel 1).
+        # If you changed insertion order, you must build a mapping.
+        if len(config["antennes"]) != len(w_phase_deg):
+            raise RuntimeError(
+                f"Mismatch: config has {len(config['antennes'])} TX entries but CIR has {len(w_phase_deg)} TX."
+            )
 
-# IMPORTANT: This assumes the TX ordering in paths.cir() matches the ordering
-# you added Transmitters / the ordering in config["antennes"] (channel 1).
-# If you changed insertion order, you must build a mapping.
-if len(config["antennes"]) != len(w_phase_deg):
-    raise RuntimeError(
-        f"Mismatch: config has {len(config['antennes'])} TX entries but CIR has {len(w_phase_deg)} TX."
-    )
+        for i, c in enumerate(config["antennes"]):
+            ch1 = c["channels"][1]
+            tile_name = c["tile"]
 
-for i, c in enumerate(config["antennes"]):
-    ch1 = c["channels"][1]
-    tile_name = c["tile"]
+            # ensure list exists
+            out_full_dict[tile_name] = []
+            out_dict[tile_name] = (
+                float(w_phase_deg[i])
+            )  # done just to compare with my LoS computations
 
-    # ensure list exists
-    out_full_dict[tile_name] = []
-    out_dict[tile_name] = (
-        float(w_phase_deg[i])
-    )  # done just to compare with my LoS computations
+            # CH 0 forced to zero
+            out_full_dict[tile_name].append({"ch": 0, "ampl": float(0.0), "phase": float(0.0)})
 
-    # CH 0 forced to zero
-    out_full_dict[tile_name].append({"ch": 0, "ampl": float(0.0), "phase": float(0.0)})
+            # CH 1 uses Sionna-derived phase, fixed amplitude
+            out_full_dict[tile_name].append(
+                {"ch": 1, "ampl": float(0.8), "phase": float(w_phase_deg[i])}
+            )
 
-    # CH 1 uses Sionna-derived phase, fixed amplitude
-    out_full_dict[tile_name].append(
-        {"ch": 1, "ampl": float(0.8), "phase": float(w_phase_deg[i])}
-    )
+        output_path = "../client/tx-weights-sionna.yml"
+        with open(output_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(out_full_dict, f, sort_keys=False)
 
-output_path = "../client/tx-weights-sionna.yml"
-with open(output_path, "w", encoding="utf-8") as f:
-    yaml.safe_dump(out_full_dict, f, sort_keys=False)
+            output_path = f"../client/tx-phases-sionna-{specular_order}{'' if not SDR else 'SDR'}.yml"
+        with open(output_path, "w", encoding="utf-8") as f:
+            yaml.safe_dump(out_dict, f, sort_keys=False)
 
-    output_path = f"../client/tx-phases-sionna-{specular_order}{'' if not SDR else 'SDR'}.yml"
-with open(output_path, "w", encoding="utf-8") as f:
-    yaml.safe_dump(out_dict, f, sort_keys=False)
+        print(f"Wrote Sionna-based TX weights to: {output_path}")
 
-print(f"Wrote Sionna-based TX weights to: {output_path}")
+        del paths, a, tau, scene
 
-# %%
+        # %%
