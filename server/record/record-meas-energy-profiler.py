@@ -2,15 +2,19 @@
 #                                       IMPORTS / PATHS                                      #
 # ****************************************************************************************** #
 
+import argparse
+from time import sleep, time
+from typing import Optional
+
 from Positioner import PositionerClient
 from TechtilePlotter.TechtilePlotter import TechtilePlotter
-import os
 import atexit
+import os
 import signal
-from time import sleep, time
+import sys
+
 import numpy as np
 import zmq
-import sys
 
 # ****************************************************************************************** #
 #                                           CONFIG                                           #
@@ -19,6 +23,7 @@ import sys
 SAVE_EVERY = 60.0  # seconds
 FOLDER = "RANDOM-2"  # subfolder inside data/ where to save measurement data
 TIMESTAMP = round(time())
+DEFAULT_DURATION = None  # seconds, override via CLI
 
 # -------------------------------------------------
 # Directory and file names
@@ -31,8 +36,8 @@ project_dir = os.path.dirname(server_dir)
 # -------------------------------------------------
 PROJECT_ROOT = os.path.dirname(project_dir)
 sys.path.insert(0, PROJECT_ROOT)
-from lib.yaml_utils import read_yaml_file
 from lib.ep import RFEP
+from lib.yaml_utils import read_yaml_file
 
 # -------------------------------------------------
 # config file
@@ -49,6 +54,30 @@ os.makedirs(save_dir, exist_ok=True)
 #                                      INITIALIZATION                                        #
 # ****************************************************************************************** #
 
+parser = argparse.ArgumentParser(description="Record energy profiler measurements.")
+parser.add_argument(
+    "--duration",
+    dest="duration",
+    type=str,
+    help="Stop recording after a duration (e.g. '3h', '30m', '45s').",
+)
+args = parser.parse_args()
+
+def _parse_duration(value: Optional[str]) -> Optional[float]:
+    if not value:
+        return None
+    value = value.strip().lower()
+    unit = value[-1]
+    if unit in {"h", "m", "s"} and len(value) > 1:
+        num = float(value[:-1])
+        if unit == "h":
+            return num * 3600.0
+        if unit == "m":
+            return num * 60.0
+        return num
+    return float(value)
+
+max_duration = _parse_duration(args.duration) or DEFAULT_DURATION
 positioner = PositionerClient(config=settings["positioning"], backend="zmq")
 rfep = RFEP(settings["ep"]["ip"], settings["ep"]["port"])
 
@@ -154,6 +183,9 @@ try:
             last_save = time()
 
         sleep(0.1)
+        if max_duration is not None and time() - start_time >= max_duration:
+            print(f"Reached configured duration ({max_duration:.0f} s). Stopping.")
+            break
         if stop_requested:
             print("Stop requested. Exiting loop...")
             break
