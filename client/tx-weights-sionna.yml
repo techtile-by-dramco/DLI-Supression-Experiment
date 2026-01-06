@@ -4,291 +4,291 @@ A05:
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -5.626219272613525
+  phase: -44.40153121948242
 A06:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -141.88372802734375
+  phase: -150.24737548828125
 A07:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 161.2047576904297
+  phase: -178.84019470214844
 A08:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -175.5131072998047
+  phase: -129.00318908691406
 A09:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 23.864469528198242
+  phase: -2.7725682258605957
 A10:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 179.6129913330078
+  phase: -165.00306701660156
 B05:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -116.6053237915039
+  phase: -93.76205444335938
 B06:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 138.9440460205078
+  phase: 133.63217163085938
 B07:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 100.7201919555664
+  phase: 97.56265258789062
 B08:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -177.07920837402344
+  phase: 160.36148071289062
 B09:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -52.59243392944336
+  phase: -41.98462677001953
 B10:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -155.53628540039062
+  phase: -158.65853881835938
 C05:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -0.9761151671409607
+  phase: -6.3736677169799805
 C06:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -174.25132751464844
+  phase: -177.22215270996094
 C07:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 147.9934539794922
+  phase: 135.7113800048828
 C08:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -118.90571594238281
+  phase: -142.5140838623047
 C09:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 86.88273620605469
+  phase: 59.47481918334961
 C10:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 20.93869400024414
+  phase: 3.3399903774261475
 D05:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 23.06521224975586
+  phase: 2.6676785945892334
 D06:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 172.9266815185547
+  phase: 146.65118408203125
 D07:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 92.18080139160156
+  phase: 85.96414184570312
 D08:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -144.76724243164062
+  phase: -168.9425048828125
 D09:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 100.22731018066406
+  phase: 84.35127258300781
 D10:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 97.75824737548828
+  phase: 92.21957397460938
 E05:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 166.75160217285156
+  phase: 167.08863830566406
 E06:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -88.49077606201172
+  phase: -66.08416748046875
 E07:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -108.3395767211914
+  phase: -132.17176818847656
 E08:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -30.678895950317383
+  phase: -17.899532318115234
 E09:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -97.51864624023438
+  phase: -105.4635009765625
 E10:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -57.55846405029297
+  phase: -75.4522705078125
 F05:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -104.47232055664062
+  phase: -134.1713409423828
 F06:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 48.82849884033203
+  phase: 26.446134567260742
 F07:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -43.099056243896484
+  phase: -29.131933212280273
 F08:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 66.85999298095703
+  phase: 67.24148559570312
 F09:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -58.7630729675293
+  phase: -58.21156311035156
 F10:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -65.72750854492188
+  phase: -72.9493179321289
 G05:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -25.69925308227539
+  phase: -11.969249725341797
 G06:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -166.57005310058594
+  phase: -166.82066345214844
 G07:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 138.9131317138672
+  phase: 150.7635040283203
 G08:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -136.6177978515625
+  phase: -135.4726104736328
 G09:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: 53.483787536621094
+  phase: 48.06122589111328
 G10:
 - ch: 0
   ampl: 0.0
   phase: 0.0
 - ch: 1
   ampl: 0.8
-  phase: -30.57073402404785
+  phase: -32.708396911621094

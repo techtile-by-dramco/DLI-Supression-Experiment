@@ -3,8 +3,13 @@
   \begin{axis}[
     xmin=3.03891, xmax=3.4563,
     ymin=1.52581, ymax=1.9432,
-    axis lines=none,
-    ticks=none,
+    axis lines=box,
+    xlabel={x [m]},
+    ylabel={y [m]},
+    colorbar,
+    colormap name=inferno,
+    point meta min=4.42857e-06,
+    point meta max=3.09642,
     enlargelimits=false,
     title={sionna1-E | mean power [uW]}
   ]

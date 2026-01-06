@@ -17,9 +17,19 @@ from typing import Iterable
 
 import mitsuba as mi
 
+import matplotlib.pyplot as plt
+
 # ============================================================
 # CONFIG
 # ============================================================
+WAVELENGTH = 3e8 / 920e6  # meters
+GRID_RES = 0.08 * WAVELENGTH
+GRID_BOUNDS = {
+    "xmin": 2.66882,
+    "xmax": 3.94708,
+    "ymin": 1.12416,
+    "ymax": 2.40242,
+}
 # Receiver location (single antenna RX)
 # target_location = np.array([3.278115966796875, 1.778475341796875, 0.2522267761230469], dtype=np.float32)  # center of grid
 # target_location = np.array([3.181, 1.774, 0.266], dtype=np.float32) #jarne location
@@ -96,6 +106,16 @@ def parse_args():
         "--gpu-index",
         type=int,
         help="Force a specific GPU index (overrides auto free-memory selection).",
+    )
+    parser.add_argument(
+        "--grid-plane",
+        action="store_true",
+        help="Compute beamformed power on a 2D plane (uses GRID_BOUNDS and GRID_RES).",
+    )
+    parser.add_argument(
+        "--plot-grid",
+        action="store_true",
+        help="If grid-plane is enabled, render and save a power heatmap PNG.",
     )
     return parser.parse_args()
 
@@ -213,6 +233,8 @@ solver = rt.PathSolver()
 
 for specular_order, SDR in zip(SPEC_ORDERS, SDRs):
     print(f"\n=== Specular order: {specular_order}, SDR: {SDR} ===")
+    grid_xs = grid_ys = None
+    grid_shape = None
 
     # ============================================================
     # LOAD SCENE
@@ -301,11 +323,25 @@ for specular_order, SDR in zip(SPEC_ORDERS, SDRs):
     )
 
     # ============================================================
-    # RX: single antenna receiver at target_location
+    # RX: primary receiver at target_location (+ optional grid receivers)
     # ============================================================
 
     rx = rt.Receiver(name="rx", position=target_location.tolist())
     scene.add(rx)
+
+    grid_receivers = []
+    if args.grid_plane:
+        xs = np.arange(GRID_BOUNDS["xmin"], GRID_BOUNDS["xmax"] + GRID_RES / 2, GRID_RES)
+        ys = np.arange(GRID_BOUNDS["ymin"], GRID_BOUNDS["ymax"] + GRID_RES / 2, GRID_RES)
+        grid_xs, grid_ys = xs, ys
+        grid_shape = (len(xs), len(ys))
+        grid_z = float(target_location[2])
+        for i_x, x in enumerate(xs):
+            for i_y, y in enumerate(ys):
+                name = f"rx_grid_{i_x}_{i_y}"
+                r = rt.Receiver(name=name, position=[float(x), float(y), grid_z])
+                scene.add(r)
+                grid_receivers.append((name, i_x, i_y))
 
     # ============================================================
     # TX: irregular array -> one Transmitter per TX element position (all_pts)
@@ -437,6 +473,7 @@ for specular_order, SDR in zip(SPEC_ORDERS, SDRs):
     h = ampl*np.exp(-1j * 2.0 * np.pi * fc * t)  # [num_tx, num_paths]
     w = np.sum(h, axis=-1)
     w_phase_deg = np.rad2deg(-np.angle(w))  # degrees
+    bf_weights = 0.8 * np.exp(1j * np.deg2rad(w_phase_deg))
 
     # %%
     # ------------------------------------------------------------
@@ -480,6 +517,48 @@ for specular_order, SDR in zip(SPEC_ORDERS, SDRs):
         yaml.safe_dump(out_dict, f, sort_keys=False)
 
     print(f"Wrote Sionna-based TX weights to: {output_path}")
+
+    # ============================================================
+    # OPTIONAL: BEAMFORMED POWER MAP ON 2D GRID
+    # ============================================================
+    if args.grid_plane and grid_shape is not None and len(grid_receivers) > 0:
+        grid_power = np.full(grid_shape, np.nan, dtype=float)
+        for r_idx, (name, i_x, i_y) in enumerate(grid_receivers, start=1):  # offset by 1 for target rx
+            tau_r = tau[r_idx, 0, :, 0, :]  # [num_tx, num_paths]
+            ampl_r = np.abs(a)[r_idx, 0, :, 0, :, 0]
+            h_r = ampl_r * np.exp(-1j * 2.0 * np.pi * fc * tau_r)
+            h_sum = np.sum(h_r, axis=-1)  # [num_tx]
+            rx_field = np.sum(bf_weights * h_sum)
+            grid_power[i_x, i_y] = float(np.abs(rx_field) ** 2)
+
+        grid_out = script_dir / f"grid-power-{specular_order}{'SDR' if SDR else ''}.npy"
+        np.save(grid_out, grid_power)
+        print(f"Saved beamformed grid power map to {grid_out} with shape {grid_power.shape}")
+
+        if args.plot_grid:
+            extent = [
+                GRID_BOUNDS["xmin"],
+                GRID_BOUNDS["xmax"],
+                GRID_BOUNDS["ymin"],
+                GRID_BOUNDS["ymax"],
+            ]
+            plt.figure()
+            plt.title(f"Beamformed power map | order {specular_order}{'SDR' if SDR else ''}")
+            img = plt.imshow(
+                grid_power.T,
+                origin="lower",
+                cmap="inferno",
+                extent=extent,
+            )
+            plt.xlabel("x [m]")
+            plt.ylabel("y [m]")
+            cbar = plt.colorbar(img)
+            cbar.set_label("Power (arb. units)")
+            png_out = script_dir / f"grid-power-{specular_order}{'SDR' if SDR else ''}.png"
+            plt.tight_layout()
+            plt.savefig(png_out)
+            print(f"Saved grid power heatmap to {png_out}")
+            plt.close()
 
     del paths, a, tau, scene
 

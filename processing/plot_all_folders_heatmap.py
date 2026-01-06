@@ -204,6 +204,47 @@ def heatmap_delta_db(curr_heatmap, base_heatmap):
     return diff
 
 
+def _target_mask(x_edges, y_edges, target_rect):
+    if not target_rect:
+        return None
+    x0, y0, w, h = target_rect
+    x1, y1 = x0 + w, y0 + h
+    xc = (x_edges[:-1] + x_edges[1:]) / 2
+    yc = (y_edges[:-1] + y_edges[1:]) / 2
+    mask_x = (xc >= x0) & (xc <= x1)
+    mask_y = (yc >= y0) & (yc <= y1)
+    if not mask_x.any() or not mask_y.any():
+        return None
+    return np.outer(mask_x, mask_y)
+
+
+def gain_stats(curr, base, x_edges, y_edges, target_rect=None):
+    """Return avg/max gain (linear and dB) vs baseline; optionally within target rect."""
+    mask = (
+        np.isfinite(curr)
+        & np.isfinite(base)
+        & (curr > 0)
+        & (base > 0)
+    )
+    def _stats(mask_local):
+        if mask_local is None or not np.any(mask_local):
+            return None
+        ratio = curr[mask_local] / base[mask_local]
+        avg_lin = float(np.mean(ratio))
+        max_lin = float(np.max(ratio))
+        return {
+            "avg_lin": avg_lin,
+            "max_lin": max_lin,
+            "avg_db": 10 * np.log10(avg_lin),
+            "max_db": 10 * np.log10(max_lin),
+        }
+
+    global_stats = _stats(mask)
+    target_mask = _target_mask(x_edges, y_edges, target_rect)
+    target_stats = _stats(mask & target_mask) if target_mask is not None else None
+    return global_stats, target_stats
+
+
 def compute_heatmap(xs, ys, vs, grid_res, agg="median", x_edges=None, y_edges=None):
     """Bin values onto a 2D grid and compute mean or median power per cell."""
     if x_edges is None or y_edges is None:
@@ -328,9 +369,10 @@ def plot_diff_heatmap(
     save_bitmap=False,
     png_name=None,
     bitmap_name=None,
+    title_override=None,
 ):
     """Plot the difference vs baseline in dB (folder - baseline) on aligned grid."""
-    vmax_db = 5 * np.log10(42) # we expect a sqrt(42) ~16x power gain at most
+    vmax_db = 10 * np.log10(42) # we expect a sqrt(42) ~16x power gain at most
     vmin_db = -vmax_db
     png_out = png_name or f"heatmap_vs_{baseline_name}_dB.png"
     bitmap_out = bitmap_name or f"heatmap_vs_{baseline_name}_dB_bitmap.png"
@@ -339,13 +381,14 @@ def plot_diff_heatmap(
         img = ax.imshow(
             diff_map.T,
             origin="lower",
-            cmap="coolwarm",
+            cmap=CMAP,
             vmin=vmin_db,
             vmax=vmax_db,
             extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]],
         )
         if add_axes:
-            ax.set_title(f"{os.path.basename(folder)} - {baseline_name} | delta power per cell [dB]")
+            title = title_override or f"{os.path.basename(folder)} - {baseline_name} | delta power per cell [dB]"
+            ax.set_title(title)
             ax.set_xlabel("x [m]")
             ax.set_ylabel("y [m]")
             cbar = plt.colorbar(img, ax=ax)
@@ -411,14 +454,19 @@ def export_heatmap_csv(folder, heatmap, x_edges, y_edges, suffix=""):
     print(f"Exported heatmap CSVs: {grid_path}, {x_path}, {y_path}")
 
 
-def export_heatmap_tex(folder, x_edges, y_edges, heatmap, suffix="", title="", target_rect=None):
-    """Write a small PGFPlots snippet that embeds the rendered PNG via addplot graphics (bitmap-only)."""
+def export_heatmap_tex(folder, x_edges, y_edges, heatmap, suffix="", title="", target_rect=None, vmin=None, vmax=None):
+    """Write a small PGFPlots snippet that embeds the rendered bitmap with axes/ticks/colorbar drawn in TikZ."""
     suffix_str = f"_{suffix}" if suffix else ""
     tex_path = os.path.join(folder, f"heatmap{suffix_str}.tex")
     png_name = f"heatmap{suffix_str}_bitmap.png"
     xmin, xmax = x_edges[0], x_edges[-1]
     ymin, ymax = y_edges[0], y_edges[-1]
     title_tex = title.replace("_", "\\_") if title else ""
+    finite_vals = heatmap[np.isfinite(heatmap)]
+    vmin_val = float(finite_vals.min()) if finite_vals.size else 0.0
+    vmax_val = float(finite_vals.max()) if finite_vals.size else 1.0
+    vmin_use = vmin if vmin is not None else vmin_val
+    vmax_use = vmax if vmax is not None else vmax_val
 
     lines = [
         f"% PGFPlots includegraphics example for {png_name}",
@@ -426,8 +474,13 @@ def export_heatmap_tex(folder, x_edges, y_edges, heatmap, suffix="", title="", t
         "  \\begin{axis}[",
         f"    xmin={xmin:.6g}, xmax={xmax:.6g},",
         f"    ymin={ymin:.6g}, ymax={ymax:.6g},",
-        "    axis lines=none,",
-        "    ticks=none,",
+        "    axis lines=box,",
+        "    xlabel={x [m]},",
+        "    ylabel={y [m]},",
+        "    colorbar,",
+        "    colormap name=inferno,",
+        f"    point meta min={vmin_use:.6g},",
+        f"    point meta max={vmax_use:.6g},",
         "    enlargelimits=false,",
         f"    title={{{title_tex}}}",
         "  ]",
@@ -626,6 +679,21 @@ def main():
                 xs, ys, vs, GRID_RES, agg=baseline_agg, x_edges=baseline_x_edges, y_edges=baseline_y_edges
             )
             diff_map = heatmap_delta_db(aligned_heatmap, baseline_heatmap)
+            global_gain, target_gain = gain_stats(aligned_heatmap, baseline_heatmap, baseline_x_edges, baseline_y_edges, target_rect)
+            gain_title = None
+            if global_gain:
+                gain_title = f"Δavg {global_gain['avg_db']:.1f}dB / max {global_gain['max_db']:.1f}dB"
+                print(
+                    f"Gain vs {baseline_folder_name}: avg {global_gain['avg_db']:.2f} dB ({global_gain['avg_lin']:.2f}x), "
+                    f"max {global_gain['max_db']:.2f} dB ({global_gain['max_lin']:.2f}x)"
+                )
+            if target_gain:
+                target_str = f"target Δavg {target_gain['avg_db']:.1f}dB / max {target_gain['max_db']:.1f}dB"
+                gain_title = f"{gain_title} | {target_str}" if gain_title else target_str
+                print(
+                    f"Target gain vs {baseline_folder_name}: avg {target_gain['avg_db']:.2f} dB ({target_gain['avg_lin']:.2f}x), "
+                    f"max {target_gain['max_db']:.2f} dB ({target_gain['max_lin']:.2f}x)"
+                )
             plot_diff_heatmap(
                 folder_path,
                 baseline_folder_name,
@@ -637,6 +705,7 @@ def main():
                 save_bitmap=args.export_csv,
                 png_name=f"heatmap_vs_{baseline_folder_name}_dB.png",
                 bitmap_name=f"heatmap_vs_{baseline_folder_name}_dB_bitmap.png",
+                title_override=gain_title,
             )
             if args.export_csv:
                 suffix = f"vs_{baseline_folder_name}_dB"
@@ -647,8 +716,10 @@ def main():
                     baseline_y_edges,
                     diff_map,
                     suffix=suffix,
-                    title=f"{os.path.basename(folder_path)} - {baseline_folder_name} [dB]",
+                    title=f"{os.path.basename(folder_path)} - {baseline_folder_name} [dB]{' | ' + gain_title if gain_title else ''}",
                     target_rect=target_rect,
+                    vmin=-10 * np.log10(42),
+                    vmax=10 * np.log10(42),
                 )
 
         recent_cells = None
