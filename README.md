@@ -106,6 +106,12 @@ python processing/compute-tx-phases.py
 ```
 - `processing/process-energy-ball.py` reads `server/record/data/exp-*.yml` and updates `client/tx-phases-energy-ball.yml` with the best measured phases.
 
+## Reference waveform for reciprocity tests
+Start a continuous sine reference on the B200 to avoid unwanted extra tones (note the zero wave frequency) using the client helper:
+```
+python3 client/run-ref.py --args "type=b200" --freq 920e6 --rate 250e3 --duration 1E6 --channels 0 --wave-ampl 0.8 --gain 73 -w sine --wave-freq 0
+```
+
 ## Maintenance utilities
 - `server/cleanup-clients.py`, `server/reboot-clients.py`: quick management helpers for the tiles.
 - `client/usrp-cal-bf.py`: USRP calibration/beamforming helper; `ref-RF-cable.yml` and `tx-phases-*.yml` hold calibration data.
