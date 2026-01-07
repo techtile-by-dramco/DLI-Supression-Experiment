@@ -92,7 +92,7 @@ def get_phases_and_apply_bandpass(x: np.ndarray, fs=250e3):
     y_re = butter_bandpass_filter(np.real(x), lowcut, highcut, fs, order=9, sos=sos)
     y_imag = butter_bandpass_filter(np.imag(x), lowcut, highcut, fs, order=9, sos=sos)
 
-    y = complex(y_re, y_imag)
+    y = y_re + 1j * y_imag
 
     return (
         np.angle(y),
