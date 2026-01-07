@@ -246,7 +246,7 @@ def gain_stats(curr, base, x_edges, y_edges, target_rect=None):
 
 
 def compute_heatmap(xs, ys, vs, grid_res, agg="median", x_edges=None, y_edges=None):
-    """Bin values onto a 2D grid and compute mean or median power per cell."""
+    """Bin values onto a 2D grid and compute an aggregate power per cell."""
     if x_edges is None or y_edges is None:
         min_x, max_x = xs.min(), xs.max()
         min_y, max_y = ys.min(), ys.max()
@@ -254,10 +254,9 @@ def compute_heatmap(xs, ys, vs, grid_res, agg="median", x_edges=None, y_edges=No
         y_edges = np.arange(min_y, max_y + grid_res, grid_res)
 
     heatmap = np.full((len(x_edges) - 1, len(y_edges) - 1), np.nan, dtype=float)
-    if agg not in {"mean", "median"}:
-        raise ValueError("agg must be either 'mean' or 'median'")
-    sums = np.zeros_like(heatmap, dtype=float) if agg == "mean" else None
-    cell_values = defaultdict(list) if agg == "median" else None
+    if agg not in {"mean", "median", "max", "min"}:
+        raise ValueError("agg must be one of: mean, median, max, min")
+    cell_values = defaultdict(list)
     counts = np.zeros_like(heatmap, dtype=int)
 
     xi = np.digitize(xs, x_edges) - 1
@@ -265,19 +264,19 @@ def compute_heatmap(xs, ys, vs, grid_res, agg="median", x_edges=None, y_edges=No
 
     for i_x, i_y, v in zip(xi, yi, vs):
         if 0 <= i_x < heatmap.shape[0] and 0 <= i_y < heatmap.shape[1]:
-            if agg == "mean":
-                sums[i_x, i_y] += v
-            else:
-                cell_values[(i_x, i_y)].append(v)
+            cell_values[(i_x, i_y)].append(v)
             counts[i_x, i_y] += 1
 
-    mask = counts > 0
-    if agg == "median":
-        for (i_x, i_y), values in cell_values.items():
-            heatmap[i_x, i_y] = float(np.median(values))
-        heatmap[~mask] = np.nan
-    else:
-        heatmap[mask] = sums[mask] / counts[mask]  # mean per cell
+    agg_funcs = {
+        "mean": np.mean,
+        "median": np.median,
+        "max": np.max,
+        "min": np.min,
+    }
+    func = agg_funcs[agg]
+    for (i_x, i_y), values in cell_values.items():
+        if values:
+            heatmap[i_x, i_y] = float(func(values))
     return heatmap, counts, x_edges, y_edges, xi, yi
 
 
@@ -549,7 +548,7 @@ def parse_args():
     )
     parser.add_argument(
         "--agg",
-        choices=["mean", "median"],
+        choices=["mean", "median", "max", "min"],
         default="mean",
         help="Aggregation used for heatmap cells (default: mean).",
     )
