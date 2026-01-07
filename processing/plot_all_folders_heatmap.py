@@ -313,7 +313,7 @@ def plot_heatmap(
     png_name="heatmap.png",
     bitmap_name="heatmap_bitmap.png",
 ):
-    """Render a heatmap with axes in meters."""
+    """Render heatmaps with axes in meters (linear uW and dBm)."""
 
     def _draw(ax, add_axes=True):
         img = ax.imshow(
@@ -367,6 +367,40 @@ def plot_heatmap(
         plt.show()
     else:
         plt.close(fig)
+
+    # dBm plot (vmin fixed to -30 dBm)
+    heatmap_dbm = 10 * np.log10(np.clip(heatmap * 1e-6, 1e-15, None) / 1e-3)  # uW->W then to dBm
+    fig_dbm, ax_dbm = plt.subplots()
+    img_dbm = ax_dbm.imshow(
+        heatmap_dbm.T,
+        origin="lower",
+        cmap=CMAP,
+        vmin=-30,
+        extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]],
+    )
+    ax_dbm.set_title(f"{os.path.basename(folder)} | power per cell [dBm]")
+    ax_dbm.set_xlabel("x [m]")
+    ax_dbm.set_ylabel("y [m]")
+    cbar_dbm = fig_dbm.colorbar(img_dbm, ax=ax_dbm)
+    cbar_dbm.ax.set_ylabel("Power per cell [dBm]")
+    if target_rect:
+        x0, y0, w, h = target_rect
+        ax_dbm.add_patch(
+            plt.Rectangle(
+                (x0, y0),
+                w,
+                h,
+                fill=False,
+                edgecolor="green",
+                linewidth=2,
+            )
+        )
+    fig_dbm.tight_layout()
+    plt.savefig(os.path.join(folder, png_name.replace(".png", "_dBm.png")))
+    if show:
+        plt.show()
+    else:
+        plt.close(fig_dbm)
 
     if save_bitmap:
         fig2, ax2 = plt.subplots()
