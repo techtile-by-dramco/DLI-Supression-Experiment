@@ -131,8 +131,8 @@ begin_time = 2.0
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# Stream logs to console
-console = logging.StreamHandler()
+# Stream logs to stdout
+console = logging.StreamHandler(sys.stdout)
 logger.addHandler(console)
 
 # Custom log format (includes time, level, and thread name)
