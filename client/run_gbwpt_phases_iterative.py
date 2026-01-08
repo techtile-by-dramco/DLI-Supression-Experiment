@@ -1,6 +1,5 @@
 import logging
 import os
-from random import uniform
 import socket
 import sys
 import threading
@@ -33,8 +32,7 @@ LOOPBACK_TX_GAIN = (
 RX_GAIN = 22  # Empirically determined receive gain (22 dB without splitter, 27 dB with splitter)
 CAPTURE_TIME = 10  # Duration of each capture in seconds
 FREQ = 0  # Base frequency offset (Hz); 0 means use default center frequency
-# server_ip = "10.128.52.53"  # Optional remote server address (commented out)
-SERVER_IP = "192.108.2.57"
+# SERVER_IP = "10.128.52.53"  # Optional remote server address (commented out)
 meas_id = 0  # Measurement identifier
 exp_id = 0  # Experiment identifier
 # =============================================================================
@@ -53,7 +51,7 @@ iq_socket.bind(f"tcp://*:{50001}")
 
 HOSTNAME = socket.gethostname()[4:]
 file_open = False
-# server_ip = None  # populated by settings.yml
+# SERVER_IP = None  # populated by settings.yml
 
 # =============================================================================
 #                           Custom Log Formatter
@@ -72,14 +70,14 @@ class LogFormatter(logging.Formatter):
         now = datetime.now()
         return "{:%H:%M}:{:05.2f}".format(now, now.second + now.microsecond / 1e6)
 
-    def formatTime(self, record, datefmt=None):
-        """Override the default time formatter to include fractional seconds."""
-        converter = self.converter(record.created)
-        if datefmt:
-            formatted_date = converter.strftime(datefmt)
-        else:
-            formatted_date = LogFormatter.pp_now()
-        return formatted_date
+def formatTime(self, record, datefmt=None):
+    """Override the default time formatter to include fractional seconds."""
+    converter = self.converter(record.created)
+    if datefmt:
+        formatted_date = converter.strftime(datefmt)
+    else:
+        formatted_date = LogFormatter.pp_now()
+    return formatted_date
 
 
 class ColoredFormatter(LogFormatter):
@@ -139,8 +137,9 @@ logger.addHandler(console)
 formatter = LogFormatter(
     fmt="[%(asctime)s] [%(levelname)s] (%(threadName)-10s) %(message)s"
 )
-# Colored console formatter for readability
+# Colored console output; file uses plain formatter
 console.setFormatter(ColoredFormatter(fmt=formatter._fmt))
+
 
 # Also log to file in the script directory
 file_handler = logging.FileHandler(os.path.join(os.path.dirname(__file__), "log.txt"))
@@ -234,27 +233,55 @@ def rx_ref(usrp, rx_streamer, quit_event, duration, result_queue, start_time=Non
 
         np.save(file_name_state, iq_samples)
 
-        phase_ch0, freq_slope_ch0 = tools.get_phases_and_apply_bandpass(
-            iq_samples[0, :]
+        phase_ch0, freq_slope_ch0_before, freq_slope_ch0_after = (
+            tools.get_phases_and_apply_bandpass(iq_samples[0, :])
         )
-        phase_ch1, freq_slope_ch1 = tools.get_phases_and_apply_bandpass(
-            iq_samples[1, :]
+        phase_ch1, freq_slope_ch1_before, freq_slope_ch1_after = (
+            tools.get_phases_and_apply_bandpass(iq_samples[1, :])
         )
 
-        logger.debug("Frequency offset CH0: %.4f", freq_slope_ch0 / (2 * np.pi))
-        logger.debug("Frequency offset CH1: %.4f", freq_slope_ch1 / (2 * np.pi))
+        logger.debug(
+            "Frequency offset CH0:     %.2f Hz     %.2f Hz",
+            float(freq_slope_ch0_before),
+            float(freq_slope_ch0_after),
+        )
+        logger.debug(
+            "Frequency offset CH1:     %.2f Hz     %.2f Hz",
+            float(freq_slope_ch1_before),
+            float(freq_slope_ch1_after),
+        )
 
-        logger.debug("Phase offset CH0: %.4f", np.rad2deg(phase_ch0).mean())
-        logger.debug("Phase offset CH1: %.4f", np.rad2deg(phase_ch1).mean())
+        # logger.debug(
+        #     "Phase CH0: mean %s%s min %s%s max %s%s",
+        #     fmt(np.rad2deg(tools.circmean(phase_ch0, deg=False))), DEG,
+        #     fmt(np.rad2deg(phase_ch0).min()), DEG,
+        #     fmt(np.rad2deg(phase_ch0).max()), DEG,
+        # )
+        # logger.debug(
+        #     "Phase CH1: mean %s%s min %s%s max %s%s",
+        #     fmt(np.rad2deg(tools.circmean(phase_ch1, deg=False))), DEG,
+        #     fmt(np.rad2deg(phase_ch1).min()), DEG,
+        #     fmt(np.rad2deg(phase_ch1).max()), DEG,
+        # )
 
         phase_diff = tools.to_min_pi_plus_pi(phase_ch0 - phase_ch1, deg=False)
+
+        logger.debug(
+            "Phase CH1: mean %s%s min %s%s max %s%s",
+            fmt(np.rad2deg(tools.circmean(phase_diff, deg=False))),
+            DEG,
+            fmt(np.rad2deg(phase_diff).min()),
+            DEG,
+            fmt(np.rad2deg(phase_diff).max()),
+            DEG,
+        )
 
         # phase_diff = phase_ch0 - phase_ch1
 
         _circ_mean = tools.circmean(phase_diff, deg=False)
-        _mean = np.mean(phase_diff)
+        # _mean = np.mean(phase_diff)
 
-        logger.debug("Diff cirmean and mean: %.6f", _circ_mean - _mean)
+        # logger.debug("Diff cirmean and mean: %s", fmt(_circ_mean - _mean))
 
         # result_queue.put(_mean)
         result_queue.put(_circ_mean)
@@ -266,17 +293,17 @@ def rx_ref(usrp, rx_streamer, quit_event, duration, result_queue, start_time=Non
         max_Q = np.max(np.abs(np.imag(iq_samples)), axis=1)
 
         logger.debug(
-            "MAX AMPL IQ CH0: I %.6f Q %.6f CH1:I %.6f Q %.6f",
-            max_I[0],
-            max_Q[0],
-            max_I[1],
-            max_Q[1],
+            "MAX AMPL IQ CH0: I %s Q %s CH1: I %s Q %s",
+            fmt(max_I[0]),
+            fmt(max_Q[0]),
+            fmt(max_I[1]),
+            fmt(max_Q[1]),
         )
 
         logger.debug(
-            "AVG AMPL IQ CH0: %.6f CH1: %.6f",
-            avg_ampl[0],
-            avg_ampl[1],
+            "AVG AMPL IQ CH0: %s CH1: %s",
+            fmt(avg_ampl[0]),
+            fmt(avg_ampl[1]),
         )
 
 
@@ -308,13 +335,11 @@ def setup_pps(usrp, pps):
 
 def print_tune_result(tune_res):
     logger.debug(
-        "Tune Result:\n    Target RF  Freq: %.6f (MHz)\n Actual RF  Freq: %.6f (MHz)\n Target DSP Freq: %.6f "
-        "(MHz)\n "
-        "Actual DSP Freq: %.6f (MHz)\n",
-        (tune_res.target_rf_freq / 1e6),
-        (tune_res.actual_rf_freq / 1e6),
-        (tune_res.target_dsp_freq / 1e6),
-        (tune_res.actual_dsp_freq / 1e6),
+        "Tune Result:\n    Target RF  Freq: %s MHz\n    Actual RF  Freq: %s MHz\n    Target DSP Freq: %s MHz\n    Actual DSP Freq: %s MHz",
+        fmt(tune_res.target_rf_freq / 1e6),
+        fmt(tune_res.actual_rf_freq / 1e6),
+        fmt(tune_res.target_dsp_freq / 1e6),
+        fmt(tune_res.actual_dsp_freq / 1e6),
     )
 
 
@@ -395,7 +420,7 @@ def send_usrp_in_tx_mode(ip):
     tx_mode_socket.close()
 
 
-def setup(usrp, server_ip, connect=True):
+def setup(usrp, SERVER_IP, connect=True):
     rate = RATE
     mcr = 20e6
     assert (
@@ -882,7 +907,6 @@ def tx_phase_coh(usrp, tx_streamer, quit_event, phase_corr, at_time, long_time=T
     logger.debug(f"Phases: {phases}")
     logger.debug(f"amplitudes: {amplitudes}")
     logger.debug(f"TX Gain: {FREE_TX_GAIN}")
-    logger.debug(f"TX in: {delta(usrp, at_time):0.2f}s")
 
     # Set the transmit gain for the active channel
     usrp.set_tx_gain(FREE_TX_GAIN, LOOPBACK_TX_CH)
@@ -903,14 +927,14 @@ def tx_phase_coh(usrp, tx_streamer, quit_event, phase_corr, at_time, long_time=T
     # Start the metadata monitoring thread
     tx_meta_thr = tx_meta_thread(tx_streamer, quit_event)
 
-    # # Send USRP is in TX mode for scope measurements
-    # send_usrp_in_tx_mode(SERVER_IP)
+    # Send USRP is in TX mode for scope measurements
+    send_usrp_in_tx_mode(SERVER_IP)
 
     # Allow transmission to continue for the configured duration
     if long_time:
         time.sleep(TX_TIME + delta(usrp, at_time))
     else:
-        time.sleep(CAPTURE_TIME + delta(usrp, at_time))
+        time.sleep(10.0 + delta(usrp, at_time))
 
     # Signal all threads to stop
     quit_event.set()
@@ -923,13 +947,16 @@ def tx_phase_coh(usrp, tx_streamer, quit_event, phase_corr, at_time, long_time=T
 
     quit_event.clear()
 
+    return tx_thr, tx_meta_thr
+
 
 def parse_arguments():
     """
     Parse command-line arguments for the beamforming (BF) application.
 
     This function checks for the optional server IP argument (-i or --ip)
-    and updates the global variable `server_ip` if provided.
+    and updates the global variable `SERVER_IP` if provided. It also
+    allows overriding the TX phase file.
 
     Example:
         python script.py -i 192.168.1.10
@@ -949,39 +976,30 @@ def parse_arguments():
     )
 
     parser.add_argument("--config-file", type=str)
+    parser.add_argument(
+        "--tx-phase-file",
+        type=str,
+        default="tx-phases-smc2-old.yml",
+        help="Path to TX phase YAML (default: tx-phases-smc2-old.yml)",
+    )
 
     # Parse the command-line arguments
     args = parser.parse_args()
+
+    # Log the invocation arguments for traceability
+    logger.info("Invocation args: %s", " ".join(sys.argv))
 
     # If the user provided an IP address, apply it
     if args.ip:
         logger.debug(f"Setting server IP to: {args.ip}")
         SERVER_IP = args.ip
-
-
-MEASUREMENTS_PER_TIMESLOT = 10
-
-
-def get_next_phase(
-    current_phase: float,
-    stronger: bool,
-    prev_delta: float,
-    delta_phi: float = np.pi / 50,
-) -> tuple[float, float]:
-    """Compute next phase based on energyball algorithm.
-
-    Existing random walk with memory if stronger.
-    """
-    u = prev_delta if stronger else 0.0
-    applied_delta = np.random.choice([-delta_phi, delta_phi])
-    next_phase = float(current_phase + u + applied_delta)
-    return next_phase, applied_delta
+    return args
 
 
 def main():
     global meas_id, file_name_state
 
-    parse_arguments()
+    args = parse_arguments()
 
     try:
         # Attempt to open and load calibration settings from the YAML file
@@ -1073,10 +1091,14 @@ def main():
         phi_LB = result_queue.get()
 
         # Print loopback phase
-        logger.info("Phase LB reference signal in rad: %s", phi_LB)
-        logger.info("Phase LB reference signal in degrees: %s", np.rad2deg(phi_LB))
+        logger.info(
+            "Phase LB reference signal: %s (rad) / %s%s",
+            fmt(phi_LB),
+            fmt(np.rad2deg(phi_LB)),
+            DEG,
+        )
 
-        start_next_cmd += cmd_time + 10.0 + CAPTURE_TIME  # Schedule next command
+        start_next_cmd += cmd_time + 2.0 + CAPTURE_TIME  # Schedule next command
 
         # -------------------------------------------------------------------------
         # STEP 3: Load cable phase correction from YAML configuration (if available)
@@ -1100,7 +1122,7 @@ def main():
         # -------------------------------------------------------------------------
         phi_offset = 0
         with open(
-            os.path.join(os.path.dirname(__file__), "tx-phases-energy-ball.yml"), "r"
+            os.path.join(os.path.dirname(__file__), args.tx_phase_file), "r"
         ) as phases_yaml:
             try:
                 phases_dict = yaml.safe_load(phases_yaml)
@@ -1118,83 +1140,29 @@ def main():
 
         alive_socket = context.socket(zmq.REQ)
         alive_socket.connect(f"tcp://{SERVER_IP}:{5558}")
+        logger.debug("Sending TX MODE")
+        alive_socket.send_string(f"{HOSTNAME} TX")
+        alive_socket.close()
 
         phase_corr = phi_LB - np.deg2rad(phi_cable) + np.deg2rad(phi_BF)
-        logger.info("Phase correction in rad: %s", phase_corr)
-        logger.info("Phase correction in degrees: %s", np.rad2deg(phase_corr))
+        logger.info(
+            "Phase correction: %s (rad) / %s%s",
+            fmt(phase_corr),
+            fmt(np.rad2deg(phase_corr)),
+            DEG,
+        )
 
-        # START WITH INITIAL TX
-        prev_delta = 0
-        prev_phase = phase_corr
-        stronger = False
-        best_phase = phase_corr
-
-        # tx_phase_coh(
-        #     usrp,
-        #     tx_streamer,
-        #     quit_event,
-        #     # phase_corr=phi_LB + phi_P + np.deg2rad(phi_cable),
-        #     phase_corr=phase_corr,
-        #     at_time=start_next_cmd,
-        #     long_time=False,  # Set long_time True if you want to transmit longer than 10 seconds
-        # )
-
-        # START the ENErgy ball algortihm
-        logger.info("Starting ENERGY BALL transmission...")
-
-
-        for i in range(0, 100):
-            logger.info("Step i %s (previous power was %s)", i, stronger)
-
-            applied_phase, applied_delta = get_next_phase(
-                current_phase=prev_phase,
-                stronger=stronger,
-                prev_delta=prev_delta
-            )
-
-            start_now_cmd = start_next_cmd
-
-            tx_phase_coh(
-                usrp,
-                tx_streamer,
-                quit_event,
-                phase_corr=applied_phase,
-                at_time=start_now_cmd,
-                long_time=False,  # Set long_time True if you want to transmit longer than 10 seconds
-            )
-
-            prev_delta = applied_delta
-            prev_phase = applied_phase
-
-            logger.debug("Sending TX DONE MODE")
-
-            start_next_cmd += 10.0  # Schedule next command
-            time.sleep(uniform(0, 1)) #ensure all RPIs do not send all at once
-            send_str_start = time.time()
-            alive_socket.send_string(
-                f"{HOSTNAME} {applied_phase} {applied_delta} {delta(usrp, start_next_cmd):.2f}"
-            )
-
-            resp = alive_socket.recv_string()
-            logger.debug("Received from server: %s and took %ss", resp, time.time() - send_str_start)
-            parts = resp.split()
-            stronger = parts[0].lower().strip() == "true" if parts else False
-            if len(parts) > 1:
-                try:
-                    best_phase = float(parts[1])
-                except ValueError:
-                    pass
-
-        logger.debug("DONE ENERGY BALL transmission.")
-        logger.debug("STARTING LONG TRANSMISSION WITH BEST PHASES.")
         tx_phase_coh(
             usrp,
             tx_streamer,
             quit_event,
-            phase_corr=best_phase,
+            # phase_corr=phi_LB + phi_P + np.deg2rad(phi_cable),
+            phase_corr=phase_corr,
             at_time=start_next_cmd,
             long_time=True,  # Set long_time True if you want to transmit longer than 10 seconds
         )
+
+        print("DONE")
 
     except Exception as e:
         # Handle any exception gracefully
@@ -1204,7 +1172,6 @@ def main():
 
     finally:
         # Allow threads and streams to close properly
-        alive_socket.close()
         time.sleep(1)
         sys.exit(0)
 
