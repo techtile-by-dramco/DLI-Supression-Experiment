@@ -5,6 +5,7 @@
 
 # to kill it: sudo fuser -k 5557/tcp
 
+import argparse
 import logging
 import zmq
 import time
@@ -41,10 +42,13 @@ def _fmt_power(pw: float) -> str:
 # =============================================================================
 #                           Experiment Configuration
 # =============================================================================
-host = "*"  # Host address to bind to. "*" means all available interfaces.
-sync_port = "5557"  # Port used for synchronization messages.
-alive_port = "5558"  # Port used for heartbeat/alive messages.
-data_port = "5559"  # Port used for data transmission.
+DEFAULT_HOST = "*"          # Host address to bind to. "*" means all interfaces.
+DEFAULT_SYNC_PORT = "5557"  # Port used for synchronization messages.
+DEFAULT_ALIVE_PORT = "5558" # Port used for heartbeat/alive messages.
+DEFAULT_DATA_PORT = "5559"  # Port used for data transmission.
+DEFAULT_DELAY = 2           # Seconds to wait before sending SYNC.
+DEFAULT_SUBS = 42           # Expected subscribers.
+DEFAULT_WAIT_TIMEOUT = 60.0 * 10.0
 # =============================================================================
 # =============================================================================
 
@@ -55,12 +59,45 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
 logger.addHandler(handler)
 
-if len(sys.argv) > 1:
-    delay = int(sys.argv[1])
-    num_subscribers = int(sys.argv[2])
-else:
-    delay = 2
-    num_subscribers = 42 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="ZMQ energy-ball max server for GBWPT experiments."
+    )
+    parser.add_argument("--host", default=DEFAULT_HOST, help="Host to bind (default: *)")
+    parser.add_argument(
+        "--sync-port", default=DEFAULT_SYNC_PORT, help="Port for SYNC PUB (default: 5557)"
+    )
+    parser.add_argument(
+        "--alive-port", default=DEFAULT_ALIVE_PORT, help="Port for alive/ready REP (default: 5558)"
+    )
+    parser.add_argument(
+        "--data-port", default=DEFAULT_DATA_PORT, help="Port for data REP (default: 5559)"
+    )
+    parser.add_argument(
+        "--delay", type=int, default=DEFAULT_DELAY, help="Delay before sending SYNC (seconds)"
+    )
+    parser.add_argument(
+        "--num-subscribers",
+        type=int,
+        default=DEFAULT_SUBS,
+        help="Expected subscribers before SYNC",
+    )
+    parser.add_argument(
+        "--wait-timeout",
+        type=float,
+        default=DEFAULT_WAIT_TIMEOUT,
+        help="Timeout in seconds to give up waiting for new messages once some arrived (default: 600s).",
+    )
+    return parser.parse_args()
+
+
+args = parse_args()
+delay = args.delay
+num_subscribers = args.num_subscribers
+host = args.host
+sync_port = args.sync_port
+alive_port = args.alive_port
+data_port = args.data_port
 
 
 # Ensure the sync port is free before binding sockets
@@ -111,8 +148,8 @@ poller.register(
 
 # Track time of the last received message
 
-# Maximum time to wait for messages before breaking out of the inner loop (10 minutes)
-WAIT_TIMEOUT = 10.0
+# Maximum time to wait for messages before breaking out of the inner loop
+WAIT_TIMEOUT = args.wait_timeout
 
 TIME_DIFF_MSG = 1.0  # warn if gap between received messages exceeds this (s)
 
