@@ -202,15 +202,15 @@ def rx_ref(usrp, rx_streamer, quit_event, duration, result_queue, start_time=Non
 
         np.save(file_name_state, iq_samples)
 
-        phase_ch0, freq_slope_ch0 = tools.get_phases_and_apply_bandpass(
+        phase_ch0, freq_slope_ch0, _ = tools.get_phases_and_apply_bandpass(
             iq_samples[0, :]
         )
-        phase_ch1, freq_slope_ch1 = tools.get_phases_and_apply_bandpass(
+        phase_ch1, freq_slope_ch1, _ = tools.get_phases_and_apply_bandpass(
             iq_samples[1, :]
         )
 
-        logger.debug("Frequency offset CH0: %.4f", freq_slope_ch0 / (2 * np.pi))
-        logger.debug("Frequency offset CH1: %.4f", freq_slope_ch1 / (2 * np.pi))
+        logger.debug("Frequency offset CH0: %.4f", freq_slope_ch0)
+        logger.debug("Frequency offset CH1: %.4f", freq_slope_ch1)
 
         logger.debug("Phase offset CH0: %.4f", np.rad2deg(phase_ch0).mean())
         logger.debug("Phase offset CH1: %.4f", np.rad2deg(phase_ch1).mean())
@@ -523,6 +523,7 @@ def tx_ref(usrp, tx_streamer, quit_event, phase, amplitude, start_time=None):
     try:
         # Continuously transmit the reference signal until quit_event is triggered
         while not quit_event.is_set():
+            transmit_buffer *= np.exp(1j * np.random.rand(num_channels, 1000 * max_samps_per_packet) * 2 * np.pi)
             tx_streamer.send(transmit_buffer, tx_md)
 
     except KeyboardInterrupt:
