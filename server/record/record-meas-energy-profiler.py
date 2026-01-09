@@ -22,7 +22,7 @@ import zmq
 
 SAVE_EVERY = 60.0  # seconds
 FOLDER = (
-    "FRIIS-0"  # subfolder inside data/where to save measurement data
+    "RANDOM-2"  # subfolder inside data/where to save measurement data
 )
 TIMESTAMP = round(time())
 DEFAULT_DURATION = None  # seconds, override via CLI
@@ -62,6 +62,11 @@ parser.add_argument(
     dest="duration",
     type=str,
     help="Stop recording after a duration (e.g. '3h', '30m', '45s').",
+)
+parser.add_argument(
+    "--load-existing",
+    action="store_true",
+    help="Load latest *_positions.npy and *_values.npy from the save folder and plot them.",
 )
 args = parser.parse_args()
 
@@ -149,6 +154,60 @@ def _save_data_safe():
 atexit.register(_save_data_safe)
 signal.signal(signal.SIGTERM, _handle_signal)
 
+
+def _load_all_snapshots(folder_path):
+    positions_files = sorted(
+        [f for f in os.listdir(folder_path) if f.endswith("_positions.npy")]
+    )
+    values_files = sorted(
+        [f for f in os.listdir(folder_path) if f.endswith("_values.npy")]
+    )
+    if not positions_files or not values_files:
+        return []
+    pos_map = {
+        name[: -len("_positions.npy")]: os.path.join(folder_path, name)
+        for name in positions_files
+    }
+    val_map = {
+        name[: -len("_values.npy")]: os.path.join(folder_path, name)
+        for name in values_files
+    }
+    bases = sorted(set(pos_map) & set(val_map))
+    return [(pos_map[b], val_map[b]) for b in bases]
+
+
+def _load_existing_data():
+    pairs = _load_all_snapshots(save_dir)
+    if not pairs:
+        print("No existing position/value snapshots found to load.")
+        return
+    total = 0
+    for pos_path, val_path in pairs:
+        try:
+            existing_positions = np.load(pos_path, allow_pickle=True).tolist()
+            existing_values = np.load(val_path, allow_pickle=True).tolist()
+        except Exception as exc:
+            print(f"Failed to load existing snapshots {pos_path}, {val_path}: {exc}")
+            continue
+        if len(existing_positions) != len(existing_values):
+            print(
+                "Warning: existing positions and values length mismatch:",
+                len(existing_positions),
+                len(existing_values),
+            )
+        positions.extend(existing_positions)
+        values.extend(existing_values)
+        for pos, d in zip(existing_positions, existing_values):
+            plt.measurements_rt(
+                pos.x,
+                pos.y,
+                pos.z,
+                d.pwr_pw / 1e6
+            )
+        total += len(existing_positions)
+    print(f"Loaded {total} existing samples from {save_dir}.")
+
+
 # ****************************************************************************************** #
 #                                           MAIN                                             #
 # ****************************************************************************************** #
@@ -156,6 +215,8 @@ signal.signal(signal.SIGTERM, _handle_signal)
 try:
     print("Starting positioner and RFEP...")
     positioner.start()
+    if args.load_existing:
+        _load_existing_data()
 
     start_time = time()
 

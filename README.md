@@ -206,5 +206,12 @@ python3 client/run-ref.py --args "type=b200" \
 
 ---
 
+## Random benchmarks
+- `RANDOM`: 42 ceiling antennas with fixed phases (reference)
+- `RANDOM-1`: 41 ceiling antennas with a new random phase every baseband sample
+- `RANDOM-2`: 42 ceiling antennas with phases re-randomized every 100 ms (held constant within each 100 ms window)
+
+---
+
 ## 📜 License
 MIT (see `LICENSE`).
