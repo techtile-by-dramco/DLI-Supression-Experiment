@@ -1,0 +1,20 @@
+folder: FRIIS-ABS-0
+aggregation: mean
+grid_res_m: 0.03260869565217391
+target_location: 3.279058, 1.749359, 0.2528133087158203
+max_power_uW: 24.634021
+max_cell_center_m: 3.312627, 1.729637
+max_cell_index: 27, 19
+max_cell_count: 406
+first_cell_index: 23, 23
+first_position: 3.255912, 1.776618
+total_samples: 7766
+sum_counts: 7766
+cells_total: 2209
+cells_nonzero: 1965
+min_cell_count: 1
+max_cell_count_all: 406
+target_cell_index: 24, 21
+target_cell_center_m: 3.273497, 1.755724
+target_power_uW: 17.043072
+target_cell_count: 14
