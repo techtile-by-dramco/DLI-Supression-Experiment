@@ -1,0 +1,20 @@
+folder: RANDOM-ABS-REFL-0
+aggregation: mean
+grid_res_m: 0.03260869565217391
+target_location: 3.279058, 1.749359, 0.2528133087158203
+max_power_uW: 10.480363
+max_cell_center_m: 3.857055, 1.609617
+max_cell_index: 91, 36
+max_cell_count: 190
+first_cell_index: 47, 47
+first_position: 3.281323, 1.751355
+total_samples: 15909
+sum_counts: 15909
+cells_total: 9025
+cells_nonzero: 6405
+min_cell_count: 1
+max_cell_count_all: 190
+target_cell_index: 47, 47
+target_cell_center_m: 3.283142, 1.753095
+target_power_uW: 0.266119
+target_cell_count: 190

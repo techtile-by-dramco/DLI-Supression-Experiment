@@ -499,9 +499,17 @@ def tx_ref(usrp, tx_streamer, quit_event, phase, amplitude, start_time=None):
     sample = amplitude
 
     # Initialize a large transmit buffer filled with the reference signal
-    transmit_buffer = np.ones(
-        (num_channels, int(250e2)), dtype=np.complex64 # 100ms
-    )
+    # transmit_buffer = np.ones(
+    #     (num_channels, int(250e2)), dtype=np.complex64 # 100ms
+    # )
+
+    transmit_buffer = np.exp(
+        1j
+        * np.random.rand(num_channels, 1000 * tx_streamer.get_max_num_samps())
+        * 2
+        * np.pi
+    )  # 0.8 to not exceed to 1.0 threshold
+
     transmit_buffer[0, :] *= sample[0]
     transmit_buffer[1, :] *= sample[1]
 
@@ -521,12 +529,12 @@ def tx_ref(usrp, tx_streamer, quit_event, phase, amplitude, start_time=None):
     try:
         # Continuously transmit the reference signal until quit_event is triggered
         while not quit_event.is_set():
-            transmit_buffer[0, :] *= np.exp(
-                1j * np.random.rand(1) * 2 * np.pi
-            )[0]
-            transmit_buffer[1, :] *= np.exp(
-                1j * np.random.rand(1) * 2 * np.pi
-            )[0]
+            # transmit_buffer[0, :] *= np.exp(
+            #     1j * np.random.rand(1) * 2 * np.pi
+            # )[0]
+            # transmit_buffer[1, :] *= np.exp(
+            #     1j * np.random.rand(1) * 2 * np.pi
+            # )[0]
             tx_streamer.send(transmit_buffer, tx_md)
 
     except KeyboardInterrupt:
