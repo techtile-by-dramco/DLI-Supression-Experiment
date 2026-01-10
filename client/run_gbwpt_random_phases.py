@@ -500,7 +500,7 @@ def tx_ref(usrp, tx_streamer, quit_event, phase, amplitude, start_time=None):
 
     # Initialize a large transmit buffer filled with the reference signal
     transmit_buffer = np.ones(
-        (num_channels, int(250e4)), dtype=np.complex64 # 100ms
+        (num_channels, int(250e2)), dtype=np.complex64 # 100ms
     )
     transmit_buffer[0, :] *= sample[0]
     transmit_buffer[1, :] *= sample[1]
