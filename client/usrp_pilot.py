@@ -361,7 +361,7 @@ def rx_ref(
         # results = samples[LOOPBACK_RX_CH,:]
 
 
-def wait_till_go_from_server(ip, _connect=True):
+def wait_till_go_from_server(ip):
 
     global meas_id, file_open, data_file, file_name, pilot_num
     # Connect to the publisher's address
@@ -541,7 +541,7 @@ def tune_usrp(usrp, freq, channels, at_time):
     logger.info("TX LO is locked")
 
 
-def setup(usrp, server_ip, connect=True):
+def setup(usrp):
 
     rate = RATE
 
@@ -577,7 +577,7 @@ def setup(usrp, server_ip, connect=True):
     # Step2: set the time at the next pps (synchronous for all boards)
     # this is better than set_time_next_pps as we wait till the next PPS to transition and after that we set the time.
     # this ensures that the FPGA has enough time to clock in the new timespec (otherwise it could be too close to a PPS edge)
-    wait_till_go_from_server(SERVER_IP, connect)
+    wait_till_go_from_server(SERVER_IP)
     logger.info("Setting device timestamp to 0...")
     usrp.set_time_unknown_pps(uhd.types.TimeSpec(0.0))
     logger.debug("[SYNC] Resetting time.")
@@ -1040,9 +1040,6 @@ def parse_arguments():
         help="Phase value for transmission",
     )
     parser.add_argument(
-        "--ip", type=str, help="ip address of the server", required=False
-    )
-    parser.add_argument(
         "--pilot",
         type=int,
         default=1,
@@ -1055,12 +1052,6 @@ def parse_arguments():
     # Set the global variable tx_phase to the value of --phase
     tx_phase = args.phase
     pilot_num = args.pilot
-
-    if args.ip is not None:
-        if args.ip:  # and not empty
-            logger.debug("Setting server IP to: " + args.ip)
-            SERVER_IP = args.ip
-
 
 def main():
     # "mode_n=integer" #
@@ -1077,7 +1068,7 @@ def main():
     try:
         usrp = uhd.usrp.MultiUSRP("fpga=usrp_b210_fpga.bin")
         logger.info("Using Device: %s", usrp.get_pp_string())
-        tx_streamer, _ = setup(usrp, SERVER_IP, connect=_connect)
+        tx_streamer, _ = setup(usrp)
         quit_event = threading.Event()
 
         _connect = False
