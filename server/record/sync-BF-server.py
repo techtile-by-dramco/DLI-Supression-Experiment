@@ -214,8 +214,8 @@ def compute_bf_phases(
     scale=1e1,
 ):
 
-    h_C = np.exp(1j*phi2)
-    H_DL = np.exp(1j * phi1)
+    h_C = np.exp(1j*np.asarray(phi2))
+    H_DL = np.exp(1j * np.asarray(phi1))
 
     # Ensure H_DL is a row vector
     if H_DL.shape[0] != 1:
