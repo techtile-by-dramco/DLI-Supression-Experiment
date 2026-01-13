@@ -35,7 +35,13 @@ def parse_args():
         help="Port for Pilot REP (default: 5560)",
     )
     parser.add_argument("--delay", type=int, default=DEFAULT_DELAY, help="Delay before sending SYNC (seconds)")
-    parser.add_argument("--num-subscribers", type=int, default=DEFAULT_SUBS, help="Expected subscribers before SYNC")
+    parser.add_argument("--num-pilots", type=int, default=DEFAULT_SUBS, help="Expected pilots before SYNC")
+    parser.add_argument(
+        "--num-subscribers",
+        type=int,
+        default=DEFAULT_SUBS,
+        help="Expected subscribers before SYNC",
+    )
     parser.add_argument(
         "--wait-timeout",
         type=float,
@@ -48,6 +54,7 @@ def parse_args():
 args = parse_args()
 delay = args.delay
 num_subscribers = args.num_subscribers
+num_pilots = args.num_pilots
 host = args.host
 sync_port = args.sync_port
 alive_port = args.alive_port
@@ -131,7 +138,7 @@ with open(output_path, "w") as f:
 
         ################## SYNC ###########################################
 
-        while messages_received < num_subscribers:
+        while messages_received < num_subscribers + num_pilots:
             # Poll the socket for incoming messages with a 1-second timeout
             socks = dict(alive_poller.poll(1000))
 
