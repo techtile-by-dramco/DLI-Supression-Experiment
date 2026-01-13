@@ -782,7 +782,7 @@ def get_BF(phi_P1, phi_P2):
     logger.debug("Sending CSI")
 
     # Create a message dict with CSI (complex split into real and imag)
-    msg = {"host": HOSTNAME, "phi_P1": phi_P1, "phi_P2": phi_P1}
+    msg = {"host": HOSTNAME, "phi_P1": phi_P1, "phi_P2": phi_P2}
 
     # Serialize to JSON and send
     dealer_socket.send(json.dumps(msg).encode())
