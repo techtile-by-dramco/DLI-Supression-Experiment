@@ -207,15 +207,16 @@ def cvx_solver(H_DL, h_C, M, scale, alpha, P_max):
 
 from scipy.constants import c as v_c
 
+
 def compute_bf_phases(
-    phi2, # pilot 2
-    phi1, # pilot 1
+    h_C,  # pilot 2
+    H_DL,  # pilot 1
     alpha=0,
     scale=1e1,
 ):
 
-    h_C = np.exp(1j*np.asarray(phi2))
-    H_DL = np.exp(1j * np.asarray(phi1))
+    # h_C = np.exp(1j*np.asarray(phi2))
+    # H_DL = np.exp(1j * np.asarray(phi1))
 
     # Ensure H_DL is a row vector
     if H_DL.shape[0] != 1:
@@ -319,8 +320,8 @@ with open(output_path, "w") as f:
         # Clear for new round
         identities.clear()
         hostnames.clear()
-        phi_P1s.clear()
-        phi_P2s.clear()
+        csi_P1s.clear()
+        csi_P2s.clear()
 
         messages_received = 0
         start_time = time.time()
@@ -336,10 +337,13 @@ with open(output_path, "w") as f:
                 phi_P1 = float(msg_json.get("phi_P1", 0.0))
                 phi_P2 = float(msg_json.get("phi_P2", 0.0))
 
+                ampl_P1 = float(msg_json.get("ampl_P1", 0.0))
+                ampl_P2 = float(msg_json.get("ampl_P2", 0.0))
+
                 identities.append(identity)
                 hostnames.append(hostname)
-                phi_P1s.append(phi_P1)
-                phi_P2s.append(phi_P2)
+                csi_P1s.append(ampl_P1 * np.exp(1j * phi_P1))
+                csi_P2s.append(ampl_P2 * np.exp(1j * phi_P2))
 
                 messages_received += 1
                 print(
@@ -358,7 +362,7 @@ with open(output_path, "w") as f:
         if messages_received == 0:
             continue
 
-        angles = compute_bf_phases(phi_P2s, phi_P1s)
+        angles = compute_bf_phases(np.asarray(csi_P1s), np.asarray(csi_P2s))
 
         # Send individual replies to all identities
         for identity, bf_angle in zip(identities, angles):

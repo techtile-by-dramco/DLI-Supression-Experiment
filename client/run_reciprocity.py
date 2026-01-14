@@ -279,10 +279,13 @@ def rx_ref(usrp, rx_streamer, quit_event, duration, result_queue, start_time=Non
         # logger.debug("Diff cirmean and mean: %s", fmt(_circ_mean - _mean))
 
         # result_queue.put(_mean)
-        result_queue.put(_circ_mean)
 
         avg_ampl = np.mean(np.abs(iq_samples), axis=1)
         # var_ampl = np.var(np.abs(iq_samples), axis=1)
+
+        A_rms = np.sqrt(np.mean(np.abs(iq_samples) ** 2, axis=1))
+
+        result_queue.put((A_rms[1],_circ_mean)) # 
 
         max_I = np.max(np.abs(np.real(iq_samples)), axis=1)
         max_Q = np.max(np.abs(np.imag(iq_samples)), axis=1)
@@ -768,7 +771,7 @@ def measure_loopback(
     # ------------------------------------------------------------
     quit_event.clear()
 
-def get_BF(phi_P1, phi_P2):
+def get_BF(ampl_P1, phi_P1, ampl_P2, phi_P2):
     import json
 
     dealer_socket = context.socket(zmq.DEALER)
@@ -782,7 +785,7 @@ def get_BF(phi_P1, phi_P2):
     logger.debug("Sending CSI")
 
     # Create a message dict with CSI (complex split into real and imag)
-    msg = {"host": HOSTNAME, "phi_P1": phi_P1, "phi_P2": phi_P2}
+    msg = {"host": HOSTNAME, "ampl_P1": ampl_P1, "phi_P1": phi_P1, "ampl_P2":ampl_P2, "phi_P2": phi_P2}
 
     # Serialize to JSON and send
     dealer_socket.send(json.dumps(msg).encode())
@@ -994,7 +997,7 @@ def main():
         )
 
         # Retrieve pilot phase result
-        phi_RP1 = result_queue.get()
+        A_P1, phi_RP1 = result_queue.get()  # result_queue.put((A_rms[1],_circ_mean))
 
         # Print pilot phase
         logger.info(
@@ -1018,7 +1021,7 @@ def main():
         )
 
         # Retrieve pilot phase result
-        phi_RP2 = result_queue.get()
+        A_P2, phi_RP2 = result_queue.get()
 
         # Print pilot phase
         logger.info(
@@ -1042,7 +1045,7 @@ def main():
         )
 
         # Retrieve loopback phase result
-        phi_RL = result_queue.get()
+        _, phi_RL = result_queue.get()
 
         # Print loopback phase
         logger.info(
@@ -1069,7 +1072,7 @@ def main():
             except yaml.YAMLError as exc:
                 print(exc)
 
-        phi_BF = get_BF(-phi_RP1 + np.deg2rad(phi_cable), -phi_RP2 + np.deg2rad(phi_cable))
+        phi_BF = get_BF(A_P1, -phi_RP1 + np.deg2rad(phi_cable), A_P2,-phi_RP2 + np.deg2rad(phi_cable))
 
         alive_socket = context.socket(zmq.REQ)
         alive_socket.connect(f"tcp://{SERVER_IP}:{5558}")
