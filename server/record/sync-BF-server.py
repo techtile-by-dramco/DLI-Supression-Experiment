@@ -119,8 +119,8 @@ csi_poller.register(router_socket, zmq.POLLIN)
 # Data storage
 identities = []
 hostnames = []
-phi_P1s = []
-phi_P2s = []
+csi_P1s = []
+csi_P2s = []
 
 
 def dominant_eigenvector(X):
@@ -347,13 +347,15 @@ with open(output_path, "w") as f:
 
                 messages_received += 1
                 print(
-                    "event=csi host=%s count=%d total=%d phi_P1=%.6f phi_P2=%.6f"
+                    "event=csi host=%s count=%d total=%d phi_P1=%.6f phi_P2=%.6f ampl_P1=%.6f ampl_P2=%.6f"
                     % (
                         hostname,
                         messages_received,
                         num_subscribers,
                         phi_P1,
                         phi_P2,
+                        ampl_P1,
+                        ampl_P2,
                     )
                 )
 
