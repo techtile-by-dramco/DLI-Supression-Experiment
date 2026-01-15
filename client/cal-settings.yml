@@ -57,3 +57,6 @@ SYNC_PORT:  "5557"       # Port used for synchronization messages.
 ALIVE_PORT: "5558"      # Port used for heartbeat/alive messages.
 DATA_PORT:  "5559"       # Port used for data transmission.
 PILOT_PORT:  "5560"     # Port used for PILOT transmission
+
+
+BEAMFORMER: MRT # or ZAF

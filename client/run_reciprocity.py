@@ -1080,6 +1080,9 @@ def main():
 
         phi_BF = get_BF(A_P1, -phi_RP1 + np.deg2rad(phi_cable), A_P2,-phi_RP2 + np.deg2rad(phi_cable))
 
+        if BEAMFORMER == "MRT":
+            phi_BF = phi_RP1 - np.deg2rad(phi_cable)
+
         alive_socket = context.socket(zmq.REQ)
         alive_socket.connect(f"tcp://{SERVER_IP}:{5558}")
         logger.debug("Sending TX MODE")
