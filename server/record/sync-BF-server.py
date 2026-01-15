@@ -156,7 +156,7 @@ def sdr_solver(H_DL, H_BD, M, scale, alpha, P_max):
     # Problem definition and solve
     prob = cp.Problem(objective, constraints)
     prob.solve(
-        solver=cp.SCS, verbose=False
+        solver=cp.MOSEK, verbose=False
     )  # You can try other solvers, e.g., 'CVXOPT' or 'MOSEK' or 'SCS'
 
     if X_new.value is None:
@@ -194,7 +194,7 @@ def cvx_solver(H_DL, h_C, M, scale, alpha, P_max):
     # Problem definition and solve
     prob = cp.Problem(objective, constraints)
     prob.solve(
-        solver=cp.SCS, verbose=False
+        solver=cp.MOSEK, verbose=False
     )  # You can try other solvers, e.g., 'CVXOPT' or 'MOSEK' or 'SCS'
 
     if x.value is None:
@@ -209,8 +209,8 @@ from scipy.constants import c as v_c
 
 
 def compute_bf_phases(
-    H_DL,  # pilot 2
-    h_C,  # pilot 1
+    H_DL, 
+    h_C,
     alpha=0,
     scale=1e1,
 ):

@@ -1,25 +1,27 @@
 folder: AHMET-Phase2-RF-0
 aggregation: mean
-grid_res_m: 0.03260869565217391
-target_location: 3.279058, 1.749359, 0.2528133087158203
-max_power_uW: 11.315325
-max_cell_center_m: 3.690655, 1.759448
-max_cell_index: 78, 48
-max_cell_count: 133
-first_cell_index: 48, 48
+grid_res_m: 0.013043478260869566
+target_location: 3.293352, 1.759427, n/a
+max_power_uW: 10.731561
+max_cell_center_m: 3.723264, 1.739883
+max_cell_index: 40, 23
+max_cell_count: 140
+first_cell_index: 24, 24
 first_position: 3.293352, 1.759427
-baseline_folder_used: RANDOM-1
-total_samples: 20565
-sum_counts: 20565
-cells_total: 9504
-cells_nonzero: 7962
+baseline_folder_used: AHMET-Phase2-RF-0
+total_samples: 20737
+sum_counts: 20737
+cells_total: 2400
+cells_nonzero: 2335
 min_cell_count: 1
-max_cell_count_all: 133
-target_cell_index: 46, 47
-target_cell_center_m: 3.273264, 1.746405
-target_power_uW: 0.673225
-target_cell_count: 3
-baseline_folder: RANDOM-1
-baseline_target_power_uW: 0.843029
-target_gain_linear: 0.798579
-target_gain_db: -0.98
+max_cell_count_all: 140
+target_cell_index: 24, 24
+target_cell_center_m: 3.305873, 1.765970
+target_power_uW: 1.000556
+target_cell_count: 140
+target_power_dBm: -30.00
+baseline_folder: AHMET-Phase2-RF-0
+baseline_target_power_uW: 0.987677
+baseline_target_power_dBm: -30.05
+target_gain_linear: 1.013039
+target_gain_db: 0.06

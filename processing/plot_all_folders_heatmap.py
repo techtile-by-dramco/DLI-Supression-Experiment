@@ -25,7 +25,7 @@ class scope_data(object):
 
 WAVELENGTH = 3e8 / 920e6  # meters
 
-GRID_RES = 0.1 * WAVELENGTH  # meters (default; overridden by --grid-res-lambda)
+GRID_RES = 0.04 * WAVELENGTH  # meters (default; overridden by --grid-res-lambda)
 SMALL_POWER_UW = 1e-8  # threshold for reporting tiny measurements (micro-watts)
 
 
@@ -323,19 +323,30 @@ def plot_heatmap(
     recent_cells=None,
     target_rect=None,
     agg="mean",
+    cmin=None,
+    cmax=None,
+    vmin=None,
+    vmax=None,
     show=True,
     save_bitmap=False,
     png_name="heatmap.png",
     bitmap_name="heatmap_bitmap.png",
 ):
-    """Render heatmaps with axes in meters (linear uW and dBm)."""
+    """Render heatmaps with axes in meters (linear uW and dBm). cmin/cmax apply to the linear plot; vmin/vmax to dBm."""
 
     def _draw(ax, add_axes=True):
-        img = ax.imshow(
-            heatmap.T,
+        imshow_kwargs = dict(
             origin="lower",
             cmap=CMAP,
             extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]],
+        )
+        if cmin is not None:
+            imshow_kwargs["vmin"] = cmin
+        if cmax is not None:
+            imshow_kwargs["vmax"] = cmax
+        img = ax.imshow(
+            heatmap.T,
+            **imshow_kwargs,
         )
         ax.set_aspect("equal", adjustable="box")
         if add_axes:
@@ -441,15 +452,22 @@ def plot_heatmap(
     else:
         plt.close(fig_counts)
 
-    # dBm plot (vmin fixed to -30 dBm)
+    # dBm plot (uses corresponding vmin/vmax if provided)
     heatmap_dbm = 10 * np.log10(np.clip(heatmap * 1e-6, 1e-15, None) / 1e-3)  # uW->W then to dBm
+
+    dbm_kwargs = dict(
+        origin="lower",
+        cmap=CMAP,
+        extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]],
+    )
+    if vmin is not None:
+        dbm_kwargs["vmin"] = vmin  # expects dBm
+    if vmax is not None:
+        dbm_kwargs["vmax"] = vmax  # expects dBm
     fig_dbm, ax_dbm = plt.subplots()
     img_dbm = ax_dbm.imshow(
         heatmap_dbm.T,
-        origin="lower",
-        cmap=CMAP,
-        # vmin=-80,
-        extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]],
+        **dbm_kwargs,
     )
     ax_dbm.set_aspect("equal", adjustable="box")
     ax_dbm.set_title(f"{os.path.basename(folder)} | power per cell [dBm]")
@@ -565,6 +583,9 @@ def write_folder_log(
                 fh.write(f"target_cell_center_m: {_cell_center(ti_x, ti_y, x_edges, y_edges)[0]:.6f}, {_cell_center(ti_x, ti_y, x_edges, y_edges)[1]:.6f}\n")
                 fh.write(f"target_power_uW: {float(tgt_power):.6f}\n")
                 fh.write(f"target_cell_count: {tgt_count}\n")
+                if np.isfinite(tgt_power) and tgt_power > 0:
+                    tgt_power_dbm = 10 * np.log10(float(tgt_power) * 1e-6 / 1e-3)
+                    fh.write(f"target_power_dBm: {tgt_power_dbm:.2f}\n")
                 if (
                     baseline_heatmap is not None
                     and baseline_x_edges is not None
@@ -579,6 +600,9 @@ def write_folder_log(
                             gain_db = float(10 * np.log10(gain_lin))
                             fh.write(f"baseline_folder: {baseline_name or 'n/a'}\n")
                             fh.write(f"baseline_target_power_uW: {float(base_power):.6f}\n")
+                            if np.isfinite(base_power) and base_power > 0:
+                                base_power_dbm = 10 * np.log10(float(base_power) * 1e-6 / 1e-3)
+                                fh.write(f"baseline_target_power_dBm: {base_power_dbm:.2f}\n")
                             fh.write(f"target_gain_linear: {gain_lin:.6f}\n")
                             fh.write(f"target_gain_db: {gain_db:.2f}\n")
             else:
@@ -592,6 +616,8 @@ def plot_diff_heatmap(
     diff_map,
     x_edges,
     y_edges,
+    vdmin=None,
+    vdmax=None,
     target_rect=None,
     show=True,
     save_bitmap=False,
@@ -606,6 +632,8 @@ def plot_diff_heatmap(
     def _draw(ax, add_axes=True):
         img = ax.imshow(
             diff_map.T,
+            vmin=vdmin,
+            vmax=vdmax,
             origin="lower",
             cmap=CMAP,
             extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]],
@@ -757,12 +785,13 @@ def parse_args():
         help="Filter out consecutive samples with identical power values.",
     )
     parser.add_argument(
-        "--no-drop-duplicate-timestamps",
+        "--drop-duplicate-timestamps",
         dest="drop_duplicate_timestamps",
-        action="store_false",
-        help="Disable filtering of samples where position timestamp does not increase (consecutive duplicates).",
+        action="store_true",
+        help="Enable filtering of samples where position timestamp does not increase (consecutive duplicates).",
     )
-    parser.set_defaults(drop_duplicate_timestamps=True)
+    # Default: do not drop duplicate timestamps unless explicitly requested
+    parser.set_defaults(drop_duplicate_timestamps=False)
     parser.add_argument(
         "--save-only",
         action="store_true",
@@ -794,6 +823,42 @@ def parse_args():
         type=float,
         help="Grid resolution as a fraction of wavelength (e.g., 0.08 for 0.08*lambda). Overrides default.",
     )
+    parser.add_argument(
+        "--vdmin",
+        type=float,
+        default=None,
+        help="Colormap minimum for baseline delta plots (dB). If omitted, autoscale.",
+    )
+    parser.add_argument(
+        "--vdmax",
+        type=float,
+        default=None,
+        help="Colormap maximum for baseline delta plots (dB). If omitted, autoscale.",
+    )
+    parser.add_argument(
+        "--cmin",
+        type=float,
+        default=None,
+        help="Colormap minimum for the linear uW heatmap. If omitted, autoscale.",
+    )
+    parser.add_argument(
+        "--cmax",
+        type=float,
+        default=None,
+        help="Colormap maximum for the linear uW heatmap. If omitted, autoscale.",
+    )
+    parser.add_argument(
+        "--vmin",
+        type=float,
+        default=None,
+        help="Colormap minimum for the dBm plot. If omitted, autoscale.",
+    )
+    parser.add_argument(
+        "--vmax",
+        type=float,
+        default=None,
+        help="Colormap maximum for the dBm plot. If omitted, autoscale.",
+    )
     return parser.parse_args()
 
 
@@ -819,6 +884,9 @@ def print_run_summary(args, target_rect, baseline_folder_name, baseline_agg, gri
         f"- baseline folder: {baseline_desc} (agg={baseline_agg})\n"
         f"- fill_empty: {args.fill_empty}\n"
         f"- grid_res: {grid_res:.4f} m\n"
+        f"- vdmin/vdmax (baseline dB plots): {args.vdmin}/{args.vdmax}\n"
+        f"- cmin/cmax (linear uW plots): {args.cmin}/{args.cmax}\n"
+        f"- vmin/vmax (dBm plots): {args.vmin}/{args.vmax}\n"
     )
 
 
@@ -856,6 +924,12 @@ def print_drop_summary(
 
 def main():
     args = parse_args()
+    if args.vmin is not None and args.vmax is not None and args.vmin > args.vmax:
+        raise ValueError(f"--vmin ({args.vmin}) cannot be greater than --vmax ({args.vmax})")
+    if args.cmin is not None and args.cmax is not None and args.cmin > args.cmax:
+        raise ValueError(f"--cmin ({args.cmin}) cannot be greater than --cmax ({args.cmax})")
+    if args.vdmin is not None and args.vdmax is not None and args.vdmin > args.vdmax:
+        raise ValueError(f"--vdmin ({args.vdmin}) cannot be greater than --vdmax ({args.vdmax})")
     if not os.path.isdir(DATA_DIR):
         raise FileNotFoundError(f"DATA_DIR not found: {DATA_DIR}")
 
@@ -1047,6 +1121,8 @@ def main():
                 diff_map,
                 curr_baseline_x_edges,
                 curr_baseline_y_edges,
+                vdmin=args.vdmin,
+                vdmax=args.vdmax,
                 target_rect=target_rect,
                 show=not args.save_only,
                 save_bitmap=args.export_csv,
@@ -1108,6 +1184,10 @@ def main():
             recent_cells,
             target_rect,
             agg=args.agg,
+            cmin=args.cmin,
+            cmax=args.cmax,
+            vmin=args.vmin,
+            vmax=args.vmax,
             show=not args.save_only,
             save_bitmap=args.export_csv,
             png_name="heatmap.png",
