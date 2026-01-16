@@ -1,7 +1,7 @@
 folder: MRT-BD-1
 aggregation: mean
 grid_res_m: 0.013043478260869566
-target_location: 3.866079, 1.754245, n/a
+target_location: 2.860000, 1.226423, n/a
 bd_power_min_dBm: -15.77
 bd_power_max_dBm: -15.34
 bd_power_mean_dBm: -15.55
@@ -18,13 +18,13 @@ cells_total: 9888
 cells_nonzero: 9259
 min_cell_count: 1
 max_cell_count_all: 5577
-target_cell_index: 92, 48
-target_cell_center_m: 3.865095, 1.756717
-target_power_uW: 1.197348
-target_cell_count: 700
-target_power_dBm: -29.22
+target_cell_index: 15, 7
+target_cell_center_m: 2.860747, 1.221935
+target_power_uW: 13.382163
+target_cell_count: 10
+target_power_dBm: -18.73
 baseline_folder: AZF-1
-baseline_target_power_uW: 1.895107
-baseline_target_power_dBm: -27.22
-target_gain_linear: 0.631810
-target_gain_db: -1.99
+baseline_target_power_uW: 0.252912
+baseline_target_power_dBm: -35.97
+target_gain_linear: 52.912281
+target_gain_db: 17.24

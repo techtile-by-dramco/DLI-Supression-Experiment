@@ -558,8 +558,11 @@ def plot_heatmap(
             markeredgewidth=2,
         )
     fig_dbm.tight_layout()
-    dbm_png_name = png_name.replace(".png", "_dBm.png")
-    dbm_bitmap_name = bitmap_name.replace(".png", "_dBm_bitmap.png")
+    base_root = os.path.splitext(png_name)[0]
+    if base_root.endswith("_bitmap"):
+        base_root = base_root[: -len("_bitmap")]
+    dbm_png_name = f"{base_root}_dBm.png"
+    dbm_bitmap_name = f"{base_root}_dBm_bitmap.png"
     plt.savefig(os.path.join(folder, dbm_png_name))
     if save_bitmap:
         fig_dbm_bitmap, ax_dbm_bitmap = plt.subplots()
@@ -1133,6 +1136,10 @@ def main():
             print(f"Warning: baseline.txt is deprecated and ignored in {folder_path}; use config.yml instead.")
 
         folder_config = load_folder_config(folder_path)
+        if "bdmin" in folder_config and "vdmin" not in folder_config:
+            folder_config["vdmin"] = folder_config["bdmin"]
+        if "bdmax" in folder_config and "vdmax" not in folder_config:
+            folder_config["vdmax"] = folder_config["bdmax"]
 
         def apply_config(key, current_val, cli_set):
             if key not in folder_config or folder_config[key] is None:
@@ -1248,6 +1255,8 @@ def main():
                 heatmap,
                 title=f"{os.path.basename(folder_path)} | {args.agg} power [uW]",
                 target_rect=active_target_rect,
+                vmin=folder_cmin,
+                vmax=folder_cmax,
             )
             export_heatmap_csv(folder_path, heatmap_dbm, x_edges, y_edges, suffix="dBm")
             export_heatmap_tex(
@@ -1273,6 +1282,8 @@ def main():
                     suffix="zoom",
                     title=f"{os.path.basename(folder_path)} | {args.agg} power [uW] (zoom)",
                     target_rect=active_target_rect,
+                    vmin=folder_cmin,
+                    vmax=folder_cmax,
                 )
                 if zoom_heatmap_dbm is not None:
                     export_heatmap_csv(

@@ -1,7 +1,7 @@
 folder: RECI-RF-0
 aggregation: mean
 grid_res_m: 0.013043478260869566
-target_location: 3.280869, 1.757432, n/a
+target_location: 2.860000, 1.226423, n/a
 max_power_uW: 62.584357
 max_cell_center_m: 3.275558, 1.760776
 max_cell_index: 47, 47
@@ -14,8 +14,8 @@ cells_total: 9215
 cells_nonzero: 9069
 min_cell_count: 1
 max_cell_count_all: 167
-target_cell_index: 47, 47
-target_cell_center_m: 3.275558, 1.760776
-target_power_uW: 62.584357
-target_cell_count: 167
-target_power_dBm: -12.04
+target_cell_index: 15, 6
+target_cell_center_m: 2.858167, 1.225994
+target_power_uW: 2.901226
+target_cell_count: 3
+target_power_dBm: -25.37

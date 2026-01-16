@@ -1,0 +1,21 @@
+% PGFPlots includegraphics example for figures/AZF-1/heatmap_zoom_vs_MRT-BD-1_dB_bitmap.png
+\begin{tikzpicture}
+  \begin{axis}[
+    axis equal image,
+    xmin=2.68466, xmax=3.02379,
+    ymin=1.12411, ymax=1.39802,
+    axis lines=box,
+    xlabel={x [m]},
+    ylabel={y [m]},
+    colorbar,
+    colormap name=inferno,
+    point meta min=-17.8493,
+    point meta max=13.4059,
+    enlargelimits=false,
+    title={AZF-1 - MRT-BD-1 [dB] (zoom) | avg 5.8dB / max 33.5dB | target avg -16.0dB / max -13.4dB}
+  ]
+    \addplot graphics [includegraphics cmd=\pgfimage, xmin=2.68466, xmax=3.02379, ymin=1.12411, ymax=1.39802] {figures/AZF-1/heatmap_zoom_vs_MRT-BD-1_dB_bitmap.png};
+    % Target circle (radius = wavelength/8)
+    \draw[cyan,dashed,thick] (2.86,1.22642) circle [radius=0.0407609];
+  \end{axis}
+\end{tikzpicture}

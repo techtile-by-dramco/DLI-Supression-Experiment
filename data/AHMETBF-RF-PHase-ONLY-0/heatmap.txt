@@ -1,7 +1,7 @@
 folder: AHMETBF-RF-PHase-ONLY-0
 aggregation: mean
 grid_res_m: 0.013043478260869566
-target_location: 3.750727, 1.760441, n/a
+target_location: 2.860000, 1.226423, n/a
 max_power_uW: 11.998253
 max_cell_center_m: 3.290616, 2.310413
 max_cell_index: 51, 91
@@ -14,8 +14,8 @@ cells_total: 9603
 cells_nonzero: 9178
 min_cell_count: 1
 max_cell_count_all: 988
-target_cell_index: 86, 49
-target_cell_center_m: 3.747138, 1.762587
-target_power_uW: 0.874480
-target_cell_count: 988
-target_power_dBm: -30.58
+target_cell_index: 18, 8
+target_cell_center_m: 2.860182, 1.227805
+target_power_uW: 1.480797
+target_cell_count: 6
+target_power_dBm: -28.30

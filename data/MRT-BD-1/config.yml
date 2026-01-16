@@ -1,7 +1,8 @@
 baseline-folder: AZF-1
-vmin: -45
-vmax: -20
+vmin: -40
+vmax: -18
 cmin: 0
 cmax: 15
-vdmin: -38
-vdmax: -12
+vdmin: -18
+vdmax: 0
+target-location: 2.860000, 1.226423, 0.0
